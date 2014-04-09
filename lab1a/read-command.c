@@ -53,7 +53,8 @@ bool parenCountCheck(char c, int *parenCount, const int lineNum) // check for pa
 bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
 {
     int i = 0;
-    
+    if (linePos[0] == '\0')
+        return true;
     while ((linePos[i] == ' ') || (linePos[i] == '\t'))
         i++;
     char c = linePos[i];
