@@ -1,4 +1,24 @@
-This is a skeleton for CS 111 Lab 1.
+Jessica Pham 	004153744
+Josh St Clair 	904187688
 
-Replace this README file with notes on your implementation.
-Mentions any special features or limitations.
+LAB 1A 
+For part A, we were required to read in a file and create a command_stream struct. We first read in
+the file, parsed, and tokenized the file one line at a time. Then, we placed the tokens on two
+different stacks: an operations stack of enum command_types and a command stack or commands. Once
+these stacks were implemented, making the command_stream just required popping from the stacks and 
+linking the commands together.
+
+While parsing, we had to take into account syntatical errors that could carry on to the next line.
+In order to accomplish this, we kept track of the number of parentheses, as well as special
+characters that may follow after a complete command. Once an error was found, an error report with
+the line number and type of error is printed out and the program exits.
+
+There are three types of commands in the command_stream. A simple command is just a command of words
+and redirections. A special command is formed by two commands, and a subshell command points to
+another command.
+
+At the end of each complete command, we would make a tree from the stacks and returned a pointer to
+the first command. The command_stream is a linked lists of Nodes that point to the top of each
+complete command. The make_command_stream function returns the root Node that consists of the first
+complete command, and the read_command_stream returns the first node of the command_stream, and
+updates the new root to the next Node. 
