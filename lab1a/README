@@ -8,10 +8,10 @@ different stacks: an operations stack of enum command_types and a command stack 
 these stacks were implemented, making the command_stream just required popping from the stacks and 
 linking the commands together.
 
-While parsing, we had to take into account syntatical errors that could carry on to the next line.
+While parsing, we had to take into account syntactical errors that could carry on to the next line.
 In order to accomplish this, we kept track of the number of parentheses, as well as special
 characters that may follow after a complete command. Once an error was found, an error report with
-the line number and type of error is printed out and the program exits.
+the line number and type of error was printed out and the program exited.
 
 There are three types of commands in the command_stream. A simple command is just a command of words
 and redirections. A special command is formed by two commands, and a subshell command points to
