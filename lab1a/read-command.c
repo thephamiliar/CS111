@@ -53,8 +53,11 @@ bool parenCountCheck(char c, int *parenCount, const int lineNum) // check for pa
 bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
 {
     int i = 0;
+    
+    while ((linePos[i] == ' ') || (linePos[i] == '\t'))
+        i++;
     char c = linePos[i];
-    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum) && (c != ' ') && (c != '\t'))
+    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum))
     {
         fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
