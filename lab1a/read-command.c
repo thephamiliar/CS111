@@ -512,7 +512,7 @@ make_command_stream (int (*get_next_byte) (void *),
 		//reset stacks
 		opSize = 0; cmdSize = 0;	
 		cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
-	   	printf("COMMAND STREAM\n");print(root);
+//	   	printf("COMMAND STREAM\n");print(root);
 	    }
 	    else
 	    {
@@ -561,7 +561,7 @@ make_command_stream (int (*get_next_byte) (void *),
 	cmdStream->last->next = node;
 	cmdStream->last = node; 
   }
-  printf("COMMAND STREAM\n"); print(root);
+  //printf("COMMAND STREAM\n"); print(root);
  // free(stream); 
 
   if (parenCount != 0)
@@ -571,7 +571,7 @@ make_command_stream (int (*get_next_byte) (void *),
   }
 
   // free(cmdStack);
-  return 0;
+  return cmdStream;
 }
 
 command_t
