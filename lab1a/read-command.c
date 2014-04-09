@@ -289,6 +289,9 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
     	}
 	else if (op1 == PIPE_COMMAND && op1 > op2)
 	{
+	    int i = index;
+	    if (s[i] != '\0')
+	    {
 	    //pop pipe and top of cmd stack = left
 	    *opSize = (*opSize)-1; 
 	    token = get_next_token(s, &index, opStack, opSize, cmdStack, cmdSize);
@@ -299,6 +302,9 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
 	    cmdStack[(*cmdSize)] = new_cmd;
 	    *cmdSize = (*cmdSize)+1;
 	    continue;
+	    }
+	    else
+	    	break;
 	}
 	
 	token = get_next_token(s, &index, opStack, opSize, cmdStack, cmdSize);
@@ -423,17 +429,32 @@ command_t make_subshell_cmd(command_t cmd)
 /* MAKE_TREE: make stream from stacks, returns root of tree */
 command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize)
 {
-    command_t cmd1, cmd2;
-    while(*opSize != 0)
-    {
-	    cmd2 = cmdStack[(*cmdSize)-1];
-	    cmd1 = cmdStack[(*cmdSize)-2];
+        enum command_type op1 = opStack[(*opSize)-1];
+	enum command_type op2 = opStack[(*opSize)-2];
+	//if op token check is higher precedence
+	if (op1 == PIPE_COMMAND && op1 > op2)
+	{
+	    //pop pipe and top of cmd stack = left
+	    *opSize = (*opSize)-1; 
+	    //pop top of cmd stack = right
+	    command_t new_cmd = make_special_cmd(cmdStack[(*cmdSize)-2], cmdStack[(*cmdSize)-1], PIPE_COMMAND);
 	    *cmdSize = (*cmdSize)-2;
-    	    cmd2 = make_special_cmd(cmd1, cmd2, opStack[(*opSize)-1]);
-	    cmdStack[(*cmdSize)] = cmd2;
-	    *opSize = (*opSize)-1; *cmdSize = (*cmdSize)+1;
+	    //push special command onto cmd stack
+	    cmdStack[(*cmdSize)] = new_cmd;
+	    *cmdSize = (*cmdSize)+1;
+	}
+    //have to pop from the front of the stacks!!!!!
+    command_t cmd1, cmd2; int c1 = 0; int c2 = 1; int op = 0;
+    while(*opSize > op)
+    {
+	    cmd1 = cmdStack[c1];
+	    cmd2 = cmdStack[c2];
+	    c1++; c2++;
+    	    cmd2 = make_special_cmd(cmd1, cmd2, opStack[op]);
+	    cmdStack[c1] = cmd2;
+	    op++;
     }
-    return cmdStack[0];
+    return cmdStack[c1];
 }
 command_stream_t init_cmd_stream()
 {
@@ -566,7 +587,7 @@ make_command_stream (int (*get_next_byte) (void *),
 
   opSize--;
   cmd_node_t node = (cmd_node_t) checked_malloc(sizeof(struct cmd_node));
- 
+
   //make tree
   command_t root = make_tree(opStack, &opSize, cmdStack, &cmdSize);
   node->next = NULL;
