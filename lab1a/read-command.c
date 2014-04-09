@@ -516,18 +516,20 @@ make_command_stream (int (*get_next_byte) (void *),
 	    }
 	    else
 	    {
-		stream[sizeOfStream] = ';';
-		stream[sizeOfStream+1] = '\0';
+		stream[sizeOfStream] = '\0';
+		printf("%s\n", stream);
 		//pass stream and parenCount into syntax checker
 		isSyntaxGood(stream, &parenCount, line);
 		//tokenize function
+		stream[sizeOfStream] = ';';
+		stream[sizeOfStream+1] = '\0';
 		tokenizer (stream, opStack, &opSize, cmdStack, &cmdSize);
 
 		//free(stream);
 		stream = (char *) checked_malloc(MAX_SIZE_ARRAY*sizeof(char));
-		line++;
 		sizeOfStream = 0;
 	    }
+	    line++;
 	}
 	else
 	{
@@ -542,13 +544,13 @@ make_command_stream (int (*get_next_byte) (void *),
 		newLine = 0;
 	}
   }
-  if (isSpecial(stream[sizeOfStream-1]))
-	fprintf(stderr, "%d: End of file has special token\n", line);
   opSize--;
   cmd_node_t node = (cmd_node_t) checked_malloc(sizeof(struct cmd_node));
  
   //make tree
   command_t root = make_tree(opStack, &opSize, cmdStack, &cmdSize);
+  if ((opSize >= cmdSize) && opSize != 0)
+	fprintf(stderr, "%d: End of file has special token\n", line);
   node->next = NULL;
   node->c = root;
   if (!cmdStream->root)
