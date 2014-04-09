@@ -42,7 +42,7 @@ bool parenCountCheck(char c, int *parenCount, const int lineNum) // check for pa
         (*parenCount)--;
         if ((*parenCount) < 0)
         {
-            fprintf(stderr, "%d: Error, no matching open parenthesis", lineNum);
+            fprintf(stderr, "%d: Error, no matching open parenthesis\n", lineNum);
             exit(1);
         }
         return true;
@@ -54,9 +54,9 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
 {
     int i = 0;
     char c = linePos[i];
-    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum))
+    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum) && (c != ' ') && (c != '\t'))
     {
-        fprintf(stderr, "%d: Error, invalid line start", lineNum);
+        fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
     }
     i++;
@@ -66,18 +66,20 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
         char b = linePos[i-1];
         char d = linePos[i+1];
         
-        if (isSpecial(c))
+        if (c == ' ' || c == '\t')
+            i++;
+        else if (isSpecial(c))
         {
             if (isSpecial(b)) //error: two special characters unless &, |
             {
-                fprintf(stderr, "%d: Syntax error", lineNum);
+                fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
             else if ((c == '&' && d == '&') || (c == '|' && d == '|'))
                 i+=2;
             else if (c == '&') // single & is error
             {
-                fprintf(stderr, "%d: Syntax error", lineNum);
+                fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
             else
@@ -89,13 +91,15 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
             i++;
         else    // invalid character
         {
-            fprintf(stderr, "%d: Syntax error", lineNum);
+            fprintf(stderr, "%d: Syntax error\n", lineNum);
             exit(1);
         }
     }
-    if (linePos[i-1] == '<' || linePos[i-1] == '>') //error: line can't end in < or >
+    while ((i > 0) && (linePos[i-1] == ' ' || linePos[i-1] == '\t')) //get rid of white space at the end
+        i--;
+    if (i > 0 && (linePos[i-1] == '<' || linePos[i-1] == '>')) //error: line can't end in < or >
     {
-        fprintf(stderr, "%d: Error, cannot end line in < or >", lineNum);
+        fprintf(stderr, "%d: Error, cannot end line in < or >\n", lineNum);
         exit(1);
     }
     return true;
