@@ -327,7 +327,7 @@ command_t make_simple_cmd (char* word)
 	    numOfWords++;
 	    numOfChars=0;
 	}
-	else if (word[i] == '<')
+	if (word[i] == '<')
 	{
 	    i++;
 	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
@@ -345,7 +345,7 @@ command_t make_simple_cmd (char* word)
 	   numOfChars=0;
 	   continue;
 	}
-	else if (word[i] == '>')
+	if (word[i] == '>')
 	{
 	    i++;
 	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
@@ -365,8 +365,11 @@ command_t make_simple_cmd (char* word)
 	}
 	else
 	{
-	    curr_word[numOfChars]=word[i];
-	    numOfChars++;
+	    if (word[i] != ' ' && word[i] != '\t')
+	    {
+	    	curr_word[numOfChars]=word[i];
+	    	numOfChars++;
+	    }
 	}
 	i++;
     }
@@ -459,7 +462,7 @@ make_command_stream (int (*get_next_byte) (void *),
   //read chars line by line until EOF
   int c; int parenCount = 0; int newLine = 0;
   command_t *cmdStack;
-  int opSize = 0; int cmdSize = 0;
+  int opSize = 0; int cmdSize = 0; bool endToken = false;
   enum command_type opStack [MAX_SIZE_ARRAY];
   cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
   command_stream_t cmdStream = init_cmd_stream();
@@ -489,6 +492,10 @@ make_command_stream (int (*get_next_byte) (void *),
 	    }
 	    if (newLine > 1)
 	    {
+ 		 if (endToken)
+		 {
+			continue;
+		  }
 		//remove top of opStack
 		opSize--;
 		cmd_node_t node = (cmd_node_t) checked_malloc(sizeof(struct cmd_node));
@@ -510,19 +517,25 @@ make_command_stream (int (*get_next_byte) (void *),
 		}
 		
 		//reset stacks
-		opSize = 0; cmdSize = 0;	
+		opSize = 0; cmdSize = 0; endToken = false;
 		cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
 //	   	printf("COMMAND STREAM\n");print(root);
 	    }
 	    else
 	    {
 		stream[sizeOfStream] = '\0';
-		printf("%s\n", stream);
+
 		//pass stream and parenCount into syntax checker
 		isSyntaxGood(stream, &parenCount, line);
+		if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
+		{
+			stream[sizeOfStream] = ';';
+			stream[sizeOfStream+1] = '\0';
+			endToken = false;
+		}
+		else
+			endToken = true;
 		//tokenize function
-		stream[sizeOfStream] = ';';
-		stream[sizeOfStream+1] = '\0';
 		tokenizer (stream, opStack, &opSize, cmdStack, &cmdSize);
 
 		//free(stream);
@@ -544,13 +557,18 @@ make_command_stream (int (*get_next_byte) (void *),
 		newLine = 0;
 	}
   }
+
+  if (endToken)
+  {
+	fprintf(stderr, "%d: End of file has special token\n", line);
+	exit(1);
+  }
+
   opSize--;
   cmd_node_t node = (cmd_node_t) checked_malloc(sizeof(struct cmd_node));
  
   //make tree
   command_t root = make_tree(opStack, &opSize, cmdStack, &cmdSize);
-  if ((opSize >= cmdSize) && opSize != 0)
-	fprintf(stderr, "%d: End of file has special token\n", line);
   node->next = NULL;
   node->c = root;
   if (!cmdStream->root)
