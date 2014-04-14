@@ -247,8 +247,11 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	}
 	else
 	{
-	    word[sizeOfWord]=s[(*index)];
-	    sizeOfWord++;
+	    if ((sizeOfWord != 0) || (s[(*index)] != ' ' && s[(*index)] != '\t'))
+	    {
+	    	word[sizeOfWord]=s[(*index)];
+	   	sizeOfWord++;
+	    }
 	}
 	(*index) = (*index)+1;
     }
@@ -278,12 +281,10 @@ void print (command_t cmd)
 void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize)
 {
     int index = 0;
-
     int token = get_next_token(s, &index, opStack, opSize, cmdStack, cmdSize);
 
     while (token== 1)
     {
-
 	index++;
         enum command_type op1 = opStack[(*opSize)-1];
 	enum command_type op2 = opStack[(*opSize)-2];
