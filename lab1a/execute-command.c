@@ -50,7 +50,8 @@ void execute_switch(command_t c)
 		executingPipe(c);
 		break;
 	default:
-		error(1, 0, "Not a valid command");
+		error(1, 0, "Not a valid command\n");
+		exit(1);
 	}
 }
 
@@ -64,14 +65,16 @@ void executingPipe(command_t c)
 
 	if ( pipe(buffer) < 0 )
 	{
-		error (1, errno, "pipe was not created");
+		error (1, errno, "pipe was not created\n");
+		exit(1);
 	}
 
 	firstPid = fork();
 	if (firstPid < 0)
-    {
-		error(1, errno, "fork was unsuccessful");
-    }
+   	{
+		error(1, errno, "fork was unsuccessful\n");
+    		exit(1);
+	}
 	else if (firstPid == 0) //child executes command on the right of the pipe
 	{
 		close(buffer[1]); //close unused write end
@@ -81,7 +84,8 @@ void executingPipe(command_t c)
         //comes from the pipe
 		if ( dup2(buffer[0], 0) < 0 )
 		{
-			error(1, errno, "error with dup2");
+			error(1, errno, "error with dup2\n");
+			exit(1);
 		}
 		execute_switch(c->u.command[1]);
 		_exit(c->u.command[1]->status);
@@ -93,15 +97,17 @@ void executingPipe(command_t c)
                             //have that child process executes command on the left of the pipe
 		if (secondPid < 0)
 		{
-			error(1, 0, "fork was unsuccessful");
+			error(1, 0, "fork was unsuccessful\n");
+			exit(1);
 		}
         else if (secondPid == 0)
 		{
 			close(buffer[0]); //close unused read end
 			if(dup2(buffer[1], 1) < 0) //redirect standard output to write end of the pipe
-            {
-				error (1, errno, "error with dup2");
-            }
+            		{
+				error (1, errno, "error with dup2\n");
+            			exit(1);
+	    		}
 			execute_switch(c->u.command[0]);
 			_exit(c->u.command[0]->status);
 		}
@@ -134,6 +140,41 @@ void executingPipe(command_t c)
 			}
 		}
 	}	
+}
+
+void executingSimple(command_t c)
+{
+	if (c->input != NULL)
+	{
+		int in = open(*input, O_RDONLY);
+		if (in < 0)
+		{
+			error(1, errno, "error with opening file\n");
+			exit(1);
+		}
+		if(dup2(0, c->input) < 0) // replace stdin with input file
+		{	
+			error(1, errno, "error with input redirection\n");
+			exit(1);
+		}
+	}
+	if (c->output != NULL)
+	{
+		int out = open(*output, O_WRONLY);
+		if (out < 0)
+		{
+			error(1, errno, "error with opening file\n");
+			exit(1);
+		}
+		if(dup2(1, c->output) < 0) // replace stdout with output file
+		{
+			error(1, errno, "error with output redirection\n");
+			exit(1);
+		}
+	}	
+	execvp(c->u.word[0], c->u.word);
+	close(c->input);
+	close(c->output);
 }
 
 void executingSubshell(command_t c)
