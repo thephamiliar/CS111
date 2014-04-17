@@ -32,7 +32,7 @@ void execute_switch(command_t c)
 	switch(c->type)
 	{
 	case SIMPLE_COMMAND:
-		executingSimple(c);
+		//executingSimple(c);
 		break;
 	case SUBSHELL_COMMAND:
 		executingSubshell(c);
@@ -179,25 +179,30 @@ void executingSimple(command_t c)
 
 void executingSubshell(command_t c)
 {
-    c->status = execute_switch(c->u.subshell_command);
+    execute_switch(c->u.subshell_command);
+    c->status = command_status(c->u.subshell_command);
 }
 
 void executingAnd(command_t c)
 {
-    if (execute_switch(c->u.command[0]) > 0)
+    execute_switch(c->u.command[0]);
+    if (command_status(c->u.command[0]) > 0)
     {
 	c->status = command_status(c->u.command[0]);
     } else {
-	c->status = execute_switch(c->u.command[1]);
+	execute_switch(c->u.command[1]);
+	c->status = command_status(c->u.command[1]);
     }
 }
 
 void executingOr(command_t c)
 {
-    if (execute_switch(c->u.command[0]) == 0)
+    execute_switch(c->u.command[0]);
+    if (command_status(c->u.command[0]) == 0)
     {
 	c->status = command_status(c->u.command[0]);
     } else {
+	execute_switch(c->u.command[1]);
 	c->status = command_status(c->u.command[1]);
     }
 }
@@ -206,7 +211,7 @@ void executingSequence(command_t c)
 {
     execute_switch(c->u.command[0]);
     execute_switch(c->u.command[1]);
-    c->status = 0;  //NOT SURE ABOUT THIS STATUS
+    c->status = command_status(c->u.command[1]);
 }
 
 void
