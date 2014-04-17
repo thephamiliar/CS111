@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 int
 command_status (command_t c)
@@ -32,7 +33,7 @@ void execute_switch(command_t c)
 	switch(c->type)
 	{
 	case SIMPLE_COMMAND:
-		//executingSimple(c);
+		executingSimple(c);
 		break;
 	case SUBSHELL_COMMAND:
 		executingSubshell(c);
@@ -144,15 +145,16 @@ void executingPipe(command_t c)
 
 void executingSimple(command_t c)
 {
+	int in, out;
 	if (c->input != NULL)
 	{
-		int in = open(*input, O_RDONLY);
+		in = open(c->input, O_RDONLY);
 		if (in < 0)
 		{
 			error(1, errno, "error with opening file\n");
 			exit(1);
 		}
-		if(dup2(0, c->input) < 0) // replace stdin with input file
+		if(dup2(0, in) < 0) // replace stdin with input file
 		{	
 			error(1, errno, "error with input redirection\n");
 			exit(1);
@@ -160,21 +162,22 @@ void executingSimple(command_t c)
 	}
 	if (c->output != NULL)
 	{
-		int out = open(*output, O_WRONLY);
+		out = open(c->output, O_WRONLY);
 		if (out < 0)
 		{
 			error(1, errno, "error with opening file\n");
 			exit(1);
 		}
-		if(dup2(1, c->output) < 0) // replace stdout with output file
+		if(dup2(1, out) < 0) // replace stdout with output file
 		{
 			error(1, errno, "error with output redirection\n");
 			exit(1);
 		}
 	}	
 	execvp(c->u.word[0], c->u.word);
-	close(c->input);
-	close(c->output);
+	close(in);
+	close(out);
+	c->status = 0;
 }
 
 void executingSubshell(command_t c)
