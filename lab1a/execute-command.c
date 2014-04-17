@@ -136,6 +136,11 @@ void executingPipe(command_t c)
 	}	
 }
 
+void executingSubshell(command_t c)
+{
+    c->status = execute_switch(c->u.subshell_command);
+}
+
 void executingAnd(command_t c)
 {
     if (execute_switch(c->u.command[0]) > 0)
@@ -148,9 +153,20 @@ void executingAnd(command_t c)
 
 void executingOr(command_t c)
 {
-
+    if (execute_switch(c->u.command[0]) == 0)
+    {
+	c->status = command_status(c->u.command[0]);
+    } else {
+	c->status = command_status(c->u.command[1]);
+    }
 }
 
+void executingSequence(command_t c)
+{
+    execute_switch(c->u.command[0]);
+    execute_switch(c->u.command[1]);
+    c->status = 0;  //NOT SURE ABOUT THIS STATUS
+}
 
 void
 execute_command (command_t c, bool time_travel)
