@@ -17,6 +17,27 @@
 #define MAX_SIZE_ARRAY 1024
 bool DEBUG = false;
 
+//SYNTATICAL FUNCTIONS
+bool isWordChar (char c);
+bool isSpecial (char c);
+bool parenCountCheck(char c, int *parenCount, const int lineNum);
+bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum);
+//STACK FUNCTIONS
+void pushCMD (command_t* cmdStack, int* cmdSize, command_t cmd);
+void pushOP (enum command_type opStack[], int* opSize, enum command_type type);
+//TOKENIZER FUNCTIONS
+int get_next_token (char *s, int* index, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
+void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
+//COMMAND FUNCTIONS
+command_t make_simple_cmd (char* word);
+command_t make_special_cmd (command_t left, command_t right, enum command_type type);
+command_t make_subshell_cmd (command_t cmd);
+command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
+//MEMORY FUNCTIONS
+//void increaseMem();
+
+
+
 bool isWordChar(char c) // is alpha-numeric or ! % + , - . / : @ ^ _
 {
     return isalpha(c) || isdigit(c)
@@ -50,6 +71,7 @@ bool parenCountCheck(char c, int *parenCount, const int lineNum) // check for pa
     return false;
 }
 
+/* SYNTAX CHECKER: checks line-by-line whether syntax is correct */
 bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
 {
     int i = 0;
@@ -109,52 +131,55 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     return true;
 }
 
-//HELPER FUNCTIONS
-int get_next_token (char *s, int* index, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
-void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
-command_t make_simple_cmd (char* word);
-command_t make_special_cmd (command_t left, command_t right, enum command_type type);
-command_t make_subshell_cmd (command_t cmd);
-command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
+/* PUSHCMD and PUSHOP: push items onto stacks */
+void pushCMD (command_t* cmdStack, int* cmdSize, command_t cmd)
+{
+	cmdStack[(*cmdSize)] = cmd;
+	*cmdSize= (*cmdSize)+1;
+}
 
-/* REALLOCATE MEMORY */
+void pushOP (enum command_type opStack[], int* opSize, enum command_type type)
+{
+	    	opStack[(*opSize)] = type;
+	    	*opSize = (*opSize)+1;
+}
 
-/* GET_NEXT_TOKEN: retrieves next tokens and adds to stack assuming syntax is valid*/
+/* GET_NEXT_TOKEN: retrieves one CMD and one OP and adds to stacks assuming syntax is valid
+		   RETURNS 1 if succeeded, 0 otherwise */
 int get_next_token (char *s, int* index, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize)
 {
+    //get word up until special token
     char* word = checked_malloc (MAX_SIZE_ARRAY*sizeof(char));
     int sizeOfWord = 0;
     while (s[(*index)] != '\0')
     {
+	//distinguish between PIPE and OR command
 	if (s[(*index)] == '|')
         {
-	    int i = (*index)+1;	    
+	    int i = (*index)+1;
+	    //OR COMMAND	    
 	    if (s[i] == '|')
 	    {
-	    	//push word onto cmd stack as simple command
+	    	//push word onto CMD stack as simple command
 		if (sizeOfWord > 0)
 		{
-	       		word[sizeOfWord] = '\0'; 
-	    		command_t cmd = make_simple_cmd(word);
-	    		cmdStack[(*cmdSize)] = cmd;
-			 *cmdSize= (*cmdSize)+1;
+		    word[sizeOfWord] = '\0'; 
+		    command_t cmd = make_simple_cmd(word);
+		    pushCMD (cmdStack, cmdSize, cmd);
 		}
-	    	//push '||' onto commands stack
-	    	opStack[(*opSize)] = OR_COMMAND;
-	    	(*index) = (*index)+1;
-	    	*opSize = (*opSize)+1;
+	    	//push 'OR' onto OP stack
+		pushOP(opStack, opSize, OR_COMMAND);
+	    	(*index) = (*index)+1; //OR takes two chars
 	    	free(word);
-	    } else {	
+	    } else {
 		if (sizeOfWord > 0)
 		{
 	   	word[sizeOfWord] = '\0';
 	    	command_t cmd = make_simple_cmd(word);
-	    	cmdStack[(*cmdSize)] = cmd;
-	  	*cmdSize= (*cmdSize)+1;
+		pushCMD (cmdStack, cmdSize, cmd);
 		}
-	    	//push s[index] onto op stack
-	    	opStack[(*opSize)] = PIPE_COMMAND;
-	    	*opSize = (*opSize)+1;
+	    	//push 'PIPE' onto op stack
+		pushOP(opStack, opSize, PIPE_COMMAND);
 	    	free(word);
 	    	
 	    }
@@ -167,13 +192,11 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	   	 //push word onto cmd stack as simple command
 	        word[sizeOfWord] = '\0';
 	        command_t cmd = make_simple_cmd(word);
-	    	cmdStack[(*cmdSize)] = cmd;
-	        *cmdSize = (*cmdSize+1);
+		pushCMD (cmdStack, cmdSize, cmd);
 	    }
 	
-	    //push s[index] onto op stack
-	    opStack[(*opSize)] = SUBSHELL_COMMAND;
-	    *opSize = (*opSize)+1;
+	    //push 'SUBSHELL_COMMAND' onto op stack
+	    pushOP(opStack, opSize, SUBSHELL_COMMAND);
 	    free(word);
     	    
 	    return 1;
@@ -185,12 +208,10 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	   	 //push word onto cmd stack as simple command
 	   	 word[sizeOfWord] = '\0';
 	   	 command_t cmd = make_simple_cmd(word);
-	   	 cmdStack[(*cmdSize)] = cmd;
-		 *cmdSize= (*cmdSize)+1;
+		 pushCMD (cmdStack, cmdSize, cmd);
 	    }
-	    //push s[index] onto op stack
-	    opStack[(*opSize)] = SUBSHELL_COMMAND2;
-	    *opSize = (*opSize)+1;
+	    //push 'SUBSHELL_COMMAND2' onto op stack
+	    pushOP(opStack, opSize, SUBSHELL_COMMAND2);
 	    free(word);
     	    return 1;
 
@@ -202,12 +223,10 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	    	//push word onto cmd stack as simple command
 	    	word[sizeOfWord] = '\0';
 	    	command_t cmd = make_simple_cmd(word);
-	    	cmdStack[(*cmdSize)] = cmd;
-	        *cmdSize= (*cmdSize)+1;
+		pushCMD (cmdStack, cmdSize, cmd);
 	    }
-	    //push s[index] onto op stack
-	    opStack[(*opSize)] = SEQUENCE_COMMAND;
-	    *opSize = (*opSize)+1;
+	    //push 'SEQUENCE_COMMAND' onto op stack
+	    pushOP(opStack, opSize, SEQUENCE_COMMAND);
 	    free(word);
     	    return 1;
 	}
@@ -218,27 +237,28 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	   	 //push word onto cmd stack as simple command
 	    	word[sizeOfWord] = '\0';
 	    	command_t cmd = make_simple_cmd(word);
-	    	cmdStack[(*cmdSize)] = cmd;
-	        *cmdSize= (*cmdSize)+1;
+		pushCMD (cmdStack, cmdSize, cmd);
 	    }
-	    //push '&&' onto stack
-	    opStack[(*opSize)] = AND_COMMAND;
-	    *opSize = (*opSize)+1;
+	    //push 'AND_COMMAND' onto stack
+	    pushOP(opStack, opSize, AND_COMMAND);
 	    free(word);
-	    (*index) = (*index)+1;
+	    (*index) = (*index)+1; //AND takes two chars
 	    return 1;
 	}
 	else
 	{
-	    word[sizeOfWord]=s[(*index)];
-	    sizeOfWord++;
+	    if ((sizeOfWord != 0) || (s[(*index)] != ' ' && s[(*index)] != '\t'))
+	    {
+	    	word[sizeOfWord]=s[(*index)];
+	   	sizeOfWord++;
+	    }
 	}
 	(*index) = (*index)+1;
     }
     free(word);
     return 0;
 }
-/* PRINT COMMANDS */
+/* PRINT COMMANDS FOR DEBUGGING */
 void print (command_t cmd)
 {
     	    if (cmd->type == SIMPLE_COMMAND)
@@ -257,16 +277,14 @@ void print (command_t cmd)
 
 	    }
 }
-/* TOKENIZER: gets tokens and adds to stacks*/
+/* TOKENIZER: gets tokens and checks precedence */
 void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize)
 {
     int index = 0;
-
     int token = get_next_token(s, &index, opStack, opSize, cmdStack, cmdSize);
 
     while (token== 1)
     {
-
 	index++;
         enum command_type op1 = opStack[(*opSize)-1];
 	enum command_type op2 = opStack[(*opSize)-2];
@@ -284,8 +302,8 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
 	    }
 	    //push special command onto cmd stack
 	    command_t new_cmd = make_subshell_cmd(cmd);
-	    cmdStack[(*cmdSize)] = new_cmd;
-	    *opSize = (*opSize)-1; *cmdSize = (*cmdSize)+1;
+	     pushCMD (cmdStack, cmdSize, new_cmd);
+	    *opSize = (*opSize)-1;
     	}
 	else if (op1 == PIPE_COMMAND && op1 > op2)
 	{
@@ -299,8 +317,7 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
 	    command_t new_cmd = make_special_cmd(cmdStack[(*cmdSize)-2], cmdStack[(*cmdSize)-1], PIPE_COMMAND);
 	    *cmdSize = (*cmdSize)-2;
 	    //push special command onto cmd stack
-	    cmdStack[(*cmdSize)] = new_cmd;
-	    *cmdSize = (*cmdSize)+1;
+	     pushCMD (cmdStack, cmdSize, new_cmd);
 	    continue;
 	    }
 	    else
@@ -456,6 +473,11 @@ command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdSta
     }
     return cmdStack[c1];
 }
+
+
+/* FIXME: Define the type 'struct command_stream' here.  This should
+   complete the incomplete type declaration in command.h.  */
+/* INITIALIZE COMMAND_STREAM */
 command_stream_t init_cmd_stream()
 {
     command_stream_t cmdStream = (command_stream_t) checked_malloc(sizeof(struct command_stream));
@@ -463,18 +485,15 @@ command_stream_t init_cmd_stream()
     cmdStream->last = NULL;
     return cmdStream;
 }
-/* FIXME: Define the type 'struct command_stream' here.  This should
-   complete the incomplete type declaration in command.h.  */
 
+
+  /* FIXME: Replace this with your implementation.  You may need to
+     add auxiliary functions and otherwise modify the source code.
+     You can also use external functions defined in the GNU C Library.  */
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
-
-
   //TOKENIZE/PARSE SCRIPT & ERROR CHECKING
   //allocate dynamic array
   char *stream; int line=1; int max_size = MAX_SIZE_ARRAY;
@@ -493,7 +512,7 @@ make_command_stream (int (*get_next_byte) (void *),
 	if (c == '#' && sizeOfStream == 0)
 	{
 	    if (DEBUG)
-	 	printf("LINE %d: \n", line);
+	 	printf("LINE %d: #\n", line);
 		while ((c != EOF) && (c != '\n'))
 		{
 			c=get_next_byte(get_next_byte_argument);
@@ -515,6 +534,7 @@ make_command_stream (int (*get_next_byte) (void *),
 	    {
  		 if (endToken)
 		 {
+			line++;
 			continue;
 		  }
 		//remove top of opStack
@@ -573,6 +593,13 @@ make_command_stream (int (*get_next_byte) (void *),
 		max_size += 1024;
 		checked_realloc(stream, max_size*sizeof(char));
 	    }
+	    if (c == ')' && endToken)
+	    {
+		fprintf(stderr, "%d: Second argument not found\n", line);
+		exit(1);
+	    }
+	    else
+		endToken = false;
 		stream[sizeOfStream] = c;
 		sizeOfStream++;
 		newLine = 0;
@@ -588,7 +615,7 @@ make_command_stream (int (*get_next_byte) (void *),
   opSize--;
   cmd_node_t node = (cmd_node_t) checked_malloc(sizeof(struct cmd_node));
 
-  //make tree
+  //make final tree
   command_t root = make_tree(opStack, &opSize, cmdStack, &cmdSize);
   node->next = NULL;
   node->c = root;
@@ -615,10 +642,10 @@ make_command_stream (int (*get_next_byte) (void *),
   return cmdStream;
 }
 
+  /* FIXME: Replace this with your implementation too.  */
 command_t
 read_command_stream (command_stream_t s)
 {
-  /* FIXME: Replace this with your implementation too.  */
   if (s->root)
   {
 	command_t cmd = s->root->c;
