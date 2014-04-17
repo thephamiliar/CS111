@@ -530,7 +530,7 @@ make_command_stream (int (*get_next_byte) (void *),
 		max_size += 1024;
 		checked_realloc(stream, max_size*sizeof(char));
 	    }
-	    if (newLine > 1)
+	    if (newLine > 1 && opSize > 0)
 	    {
  		 if (endToken)
 		 {
@@ -564,24 +564,27 @@ make_command_stream (int (*get_next_byte) (void *),
 	    }
 	    else
 	    {
-		stream[sizeOfStream] = '\0';
-
-		//pass stream and parenCount into syntax checker
-		isSyntaxGood(stream, &parenCount, line);
-		if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
+		if (sizeOfStream > 0)
 		{
-			stream[sizeOfStream] = ';';
-			stream[sizeOfStream+1] = '\0';
-			endToken = false;
-		}
-		else
-			endToken = true;
-		//tokenize function
-		tokenizer (stream, opStack, &opSize, cmdStack, &cmdSize);
+			stream[sizeOfStream] = '\0';
 
-		//free(stream);
-		stream = (char *) checked_malloc(MAX_SIZE_ARRAY*sizeof(char));
-		sizeOfStream = 0;
+			//pass stream and parenCount into syntax checker
+			isSyntaxGood(stream, &parenCount, line);
+			if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
+			{
+				stream[sizeOfStream] = ';';
+				stream[sizeOfStream+1] = '\0';
+				endToken = false;
+			}
+			else
+				endToken = true;
+			//tokenize function
+			tokenizer (stream, opStack, &opSize, cmdStack, &cmdSize);
+
+			//free(stream);
+			stream = (char *) checked_malloc(MAX_SIZE_ARRAY*sizeof(char));
+			sizeOfStream = 0;
+		}
 	    }
 	    line++;
 	}
