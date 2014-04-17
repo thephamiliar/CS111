@@ -32,7 +32,7 @@ void execute_switch(command_t c)
 	switch(c->type)
 	{
 	case SIMPLE_COMMAND:
-		executingSimple(c);
+		//executingSimple(c);
 		break;
 	case SUBSHELL_COMMAND:
 		executingSubshell(c);
@@ -170,7 +170,7 @@ void executingSequence(command_t c)
 {
     execute_switch(c->u.command[0]);
     execute_switch(c->u.command[1]);
-    c->status = 0;  //NOT SURE ABOUT THIS STATUS
+    c->status = command_status(c->u.command[1]);
 }
 
 void
