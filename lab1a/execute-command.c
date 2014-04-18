@@ -52,7 +52,7 @@ void execute_switch(command_t c)
 		break;
 	default:
 		error(1, 0, "Not a valid command\n");
-		exit(1);
+		c->status = 1;
 	}
 }
 
@@ -67,14 +67,14 @@ void executingPipe(command_t c)
 	if ( pipe(buffer) < 0 )
 	{
 		error (1, errno, "pipe was not created\n");
-		exit(1);
+		c->status = 1;
 	}
 
 	firstPid = fork();
 	if (firstPid < 0)
    	{
 		error(1, errno, "fork was unsuccessful\n");
-    		exit(1);
+    		c->status = 1;
 	}
 	else if (firstPid == 0) //child executes command on the right of the pipe
 	{
@@ -86,7 +86,7 @@ void executingPipe(command_t c)
 		if ( dup2(buffer[0], 0) < 0 )
 		{
 			error(1, errno, "error with dup2\n");
-			exit(1);
+			c->status = 1;
 		}
 		execute_switch(c->u.command[1]);
 		_exit(c->u.command[1]->status);
@@ -99,7 +99,7 @@ void executingPipe(command_t c)
 		if (secondPid < 0)
 		{
 			error(1, 0, "fork was unsuccessful\n");
-			exit(1);
+			c->status = 1;
 		}
         else if (secondPid == 0)
 		{
@@ -107,7 +107,7 @@ void executingPipe(command_t c)
 			if(dup2(buffer[1], 1) < 0) //redirect standard output to write end of the pipe
             		{
 				error (1, errno, "error with dup2\n");
-            			exit(1);
+            			c->status = 1;
 	    		}
 			execute_switch(c->u.command[0]);
 			_exit(c->u.command[0]->status);
@@ -146,44 +146,51 @@ void executingPipe(command_t c)
 void executingSimple(command_t c)
 {
 	int in, out;
-	if (c->input != NULL)
+	if (c->input != NULL) // check for input redirection
 	{
 		in = open(c->input, O_RDONLY);
 		if (in < 0)
 		{
 			error(1, errno, "error with opening file\n");
-			exit(1);
+			c->status = 1;
 		}
-		if(dup2(0, in) < 0) // replace stdin with input file
+		if(dup2(in, 0) < 0) // replace stdin with input file
 		{	
 			error(1, errno, "error with input redirection\n");
-			exit(1);
+			c->status = 1;
 		}
 	}
-	if (c->output != NULL)
+	if (c->output != NULL) // check for output redirection
 	{
 		out = open(c->output, O_WRONLY);
 		if (out < 0)
 		{
 			error(1, errno, "error with opening file\n");
-			exit(1);
+			c->status = 1;
 		}
-		if(dup2(1, out) < 0) // replace stdout with output file
+		if(dup2(out, 1) < 0) // replace stdout with output file
 		{
 			error(1, errno, "error with output redirection\n");
-			exit(1);
+			c->status = 1;
 		}
 	}	
-	execvp(c->u.word[0], c->u.word);
+	if (execvp(c->u.word[0], c->u.word) < 0) // execute commands
+	{	
+		error(1, errno, "error with command execution\n");
+		c->status = 1;
+	}
+	else
+		c->status = 0;
 	close(in);
 	close(out);
-	c->status = 0;
+	printf("TEST: executing simple\n");
 }
 
 void executingSubshell(command_t c)
 {
     execute_switch(c->u.subshell_command);
     c->status = command_status(c->u.subshell_command);
+       printf("TEST: executing subshell\n");
 }
 
 void executingAnd(command_t c)
@@ -196,6 +203,7 @@ void executingAnd(command_t c)
 	execute_switch(c->u.command[1]);
 	c->status = command_status(c->u.command[1]);
     }
+       printf("TEST: executing AND\n");
 }
 
 void executingOr(command_t c)
@@ -208,6 +216,7 @@ void executingOr(command_t c)
 	execute_switch(c->u.command[1]);
 	c->status = command_status(c->u.command[1]);
     }
+       printf("TEST: executing OR\n");
 }
 
 void executingSequence(command_t c)
@@ -215,6 +224,7 @@ void executingSequence(command_t c)
     execute_switch(c->u.command[0]);
     execute_switch(c->u.command[1]);
     c->status = command_status(c->u.command[1]);
+       printf("TEST: executing SEQ\n");
 }
 
 void
@@ -224,9 +234,8 @@ execute_command (command_t c, bool time_travel)
      add auxiliary functions and otherwise modify the source code.
      You can also use external functions defined in the GNU C Library.  
     */
-
 	if (time_travel == false)
 	{
-	    execute_switch(c);
+	 	execute_switch(c);
 	}
 }
