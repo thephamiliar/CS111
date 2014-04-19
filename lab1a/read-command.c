@@ -293,6 +293,7 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
     	{
 	    command_t cmd = cmdStack[(*cmdSize)-1];
 	    *opSize = (*opSize)-1; *cmdSize = (*cmdSize)-1;
+	    op1 = opStack[(*opSize)-1];
 	    //pop until opening parentheses = cmd
 	    while (op1 != SUBSHELL_COMMAND)
 	    {
@@ -325,6 +326,14 @@ void tokenizer (char* s, enum command_type opStack[], int* opSize, command_t* cm
 	}
 	
 	token = get_next_token(s, &index, opStack, opSize, cmdStack, cmdSize);
+	if (token == 1 && cmdStack[*cmdSize-1]->u.word[0] == NULL)
+	{
+	    cmdStack[*cmdSize-2]->input = cmdStack[*cmdSize-1]->input;
+	    cmdStack[*cmdSize-2]->output = cmdStack[*cmdSize-1]->output;
+	    *cmdSize = *cmdSize-1;
+	}
+	else
+	    continue;
     }
 }
 
@@ -509,10 +518,8 @@ make_command_stream (int (*get_next_byte) (void *),
 
   while ((c=get_next_byte(get_next_byte_argument)) != EOF)
   { 
-	if (c == '#' && sizeOfStream == 0)
+	if (c == '#' && (sizeOfStream == 0 || stream[sizeOfStream-1] == ' ' || stream[sizeOfStream-1] == '\t'))
 	{
-	    if (DEBUG)
-	 	printf("LINE %d: #\n", line);
 		while ((c != EOF) && (c != '\n'))
 		{
 			c=get_next_byte(get_next_byte_argument);
@@ -521,7 +528,7 @@ make_command_stream (int (*get_next_byte) (void *),
 		line++;
 	     newLine = 0;
  	}
-	else if (c == '\n') //CHECK FOR DOUBLE NEWLINES, HAVE TO MAKE NEW STACKS 
+	if (c == '\n') //CHECK FOR DOUBLE NEWLINES, HAVE TO MAKE NEW STACKS 
 	{
 	    newLine++;
 	    //check for memory allocation
