@@ -67,14 +67,12 @@ void executingPipe(command_t c)
 	if ( pipe(buffer) < 0 )
 	{
 		error (1, errno, "pipe was not created\n");
-		c->status = 1;
 	}
 
 	firstPid = fork();
 	if (firstPid < 0)
    	{
 		error(1, errno, "fork was unsuccessful\n");
-    		c->status = 1;
 	}
 	else if (firstPid == 0) //child executes command on the right of the pipe
 	{
@@ -86,7 +84,6 @@ void executingPipe(command_t c)
 		if ( dup2(buffer[0], 0) < 0 )
 		{
 			error(1, errno, "error with dup2\n");
-			c->status = 1;
 		}
 		execute_switch(c->u.command[1]);
 		_exit(c->u.command[1]->status);
@@ -99,15 +96,13 @@ void executingPipe(command_t c)
 		if (secondPid < 0)
 		{
 			error(1, 0, "fork was unsuccessful\n");
-			c->status = 1;
 		}
-        else if (secondPid == 0)
+        	else if (secondPid == 0)
 		{
 			close(buffer[0]); //close unused read end
 			if(dup2(buffer[1], 1) < 0) //redirect standard output to write end of the pipe
             		{
 				error (1, errno, "error with dup2\n");
-            			c->status = 1;
 	    		}
 			execute_switch(c->u.command[0]);
 			_exit(c->u.command[0]->status);
@@ -145,52 +140,55 @@ void executingPipe(command_t c)
 
 void executingSimple(command_t c)
 {
-	int in, out;
-	if (c->input != NULL) // check for input redirection
-	{
-		in = open(c->input, O_RDONLY);
-		if (in < 0)
-		{
-			error(1, errno, "error with opening file\n");
-			c->status = 1;
-		}
-		if(dup2(in, 0) < 0) // replace stdin with input file
-		{	
-			error(1, errno, "error with input redirection\n");
-			c->status = 1;
-		}
-	}
-	if (c->output != NULL) // check for output redirection
-	{
-		out = open(c->output, O_WRONLY);
-		if (out < 0)
-		{
-			error(1, errno, "error with opening file\n");
-			c->status = 1;
-		}
-		if(dup2(out, 1) < 0) // replace stdout with output file
-		{
-			error(1, errno, "error with output redirection\n");
-			c->status = 1;
-		}
-	}	
-	if (execvp(c->u.word[0], c->u.word) < 0) // execute commands
+	int eStatus;
+	pid_t pid = fork();
+        if (pid < 0)
+        {       
+               error(1, 0, "fork was unsuccessful\n");
+        }
+	else if (pid == 0) // child process
 	{	
-		error(1, errno, "error with command execution\n");
-		c->status = 1;
+		int in, out;
+		if (c->input != NULL) // check for input redirection
+		{
+			in = open(c->input, O_RDONLY);
+			if (in < 0)
+			{
+				error(1, errno, "error with opening file\n");
+			}
+			if(dup2(in, 0) < 0) // replace stdin with input file
+			{	
+				error(1, errno, "error with input redirection\n");
+			}
+		}
+		if (c->output != NULL) // check for output redirection
+		{
+			out = open(c->output, O_WRONLY| O_CREAT| O_TRUNC, 0600);
+			if (out < 0)
+			{
+				error(1, errno, "error with opening file\n");
+			}
+			if(dup2(out, 1) < 0) // replace stdout with output file
+			{
+				error(1, errno, "error with output redirection\n");
+			}
+		}
+		close(in);
+		close(out);
+		execvp(c->u.word[0], c->u.word); // execute commands
+		error(1, errno, "error with command execution\n"); // execvp shouldn't return unless error
 	}
-	else
-		c->status = 0;
-	close(in);
-	close(out);
-	printf("TEST: executing simple\n");
+	else //parent process
+	{
+		waitpid(pid, &eStatus, 0);
+		c->status = WEXITSTATUS(eStatus);
+	}
 }
 
 void executingSubshell(command_t c)
 {
     execute_switch(c->u.subshell_command);
     c->status = command_status(c->u.subshell_command);
-       printf("TEST: executing subshell\n");
 }
 
 void executingAnd(command_t c)
@@ -203,7 +201,6 @@ void executingAnd(command_t c)
 	execute_switch(c->u.command[1]);
 	c->status = command_status(c->u.command[1]);
     }
-       printf("TEST: executing AND\n");
 }
 
 void executingOr(command_t c)
@@ -216,15 +213,13 @@ void executingOr(command_t c)
 	execute_switch(c->u.command[1]);
 	c->status = command_status(c->u.command[1]);
     }
-       printf("TEST: executing OR\n");
 }
 
 void executingSequence(command_t c)
-{
+{ 
     execute_switch(c->u.command[0]);
     execute_switch(c->u.command[1]);
     c->status = command_status(c->u.command[1]);
-       printf("TEST: executing SEQ\n");
 }
 
 void
@@ -236,6 +231,6 @@ execute_command (command_t c, bool time_travel)
     */
 	if (time_travel == false)
 	{
-	 	execute_switch(c);
+		execute_switch(c);
 	}
 }
