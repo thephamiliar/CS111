@@ -362,6 +362,7 @@ command_t make_simple_cmd (char* word)
 		}
 		i++;
 	    }
+            curr_word[numOfChars] = '\0';
 	    //input
 	   new_cmd->input = curr_word; 
            curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
@@ -380,6 +381,7 @@ command_t make_simple_cmd (char* word)
 		}
 		i++;
 	    }
+	    curr_word[numOfChars] = '\0';	
 	    //output
 	   new_cmd->output = curr_word; 
            curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
@@ -396,6 +398,7 @@ command_t make_simple_cmd (char* word)
 	}
 	i++;
     }
+    curr_word[numOfChars] = '\0';
     if (numOfChars == 0)
     {
 	free(curr_word);
@@ -403,7 +406,8 @@ command_t make_simple_cmd (char* word)
     else
     {
         new_cmd->u.word[numOfWords] = curr_word;
-    }
+        new_cmd->u.word[numOfWords+1] = NULL;
+     }
     if (DEBUG)
 	printf("Exiting simple command...\n");
     return new_cmd;
