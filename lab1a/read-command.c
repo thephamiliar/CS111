@@ -34,7 +34,6 @@ command_t make_special_cmd (command_t left, command_t right, enum command_type t
 command_t make_subshell_cmd (command_t cmd);
 command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
 //MEMORY FUNCTIONS
-//void increaseMem();
 
 
 
