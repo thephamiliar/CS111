@@ -143,7 +143,7 @@ void setupInOut(command_t c)
     int in, out;
     if (c->input != NULL) // check for input redirection  
     {
-        in = open(c->input, O_RDONLY);
+	in = open(c->input, O_RDONLY);
         if (in < 0)
         {
             error(1, errno, "error with opening file\n");
@@ -152,14 +152,14 @@ void setupInOut(command_t c)
         {
             error(1, errno, "error with input redirection\n");
         }
-        if( close(in) < 0)
+        if(close(in) < 0)
         {
             error(1, errno, "error with closing file\n");
         }
     }
     if (c->output != NULL) // check for output redirection
     { 
-        out = open(c->output, O_WRONLY| O_CREAT| O_TRUNC, 0600);
+	out = open(c->output, O_WRONLY| O_CREAT| O_TRUNC, 0600);
         if (out < 0)
         {
             error(1, errno, "error with opening file\n");
@@ -186,6 +186,8 @@ void executingSimple(command_t c)
 	else if (pid == 0) // child process
 	{	
 		setupInOut(c); // redirects inputs and outputs
+		if (strcmp(c->u.word[0],"exec") == 0)
+			execvp(c->u.word[1], c->u.word++);
 		execvp(c->u.word[0], c->u.word); // execute commands
 		error(1, errno, "error with command execution\n"); // execvp shouldn't return unless error
 	}
@@ -198,9 +200,23 @@ void executingSimple(command_t c)
 
 void executingSubshell(command_t c)
 {
-    setupInOut(c); // redirect inputs and outputs if necessary
-    execute_switch(c->u.subshell_command);
-    c->status = command_status(c->u.subshell_command);
+	int eStatus;
+        pid_t pid = fork();
+        if (pid < 0)
+        {
+               error(1, 0, "fork was unsuccessful\n");
+        }
+        else if (pid == 0) // child process
+        {
+                setupInOut(c); // redirects inputs and outputs
+                execute_switch(c->u.subshell_command);
+        	_exit(command_status(c->u.subshell_command));
+	}
+        else //parent process
+        {
+                waitpid(pid, &eStatus, 0);
+                c->status = WEXITSTATUS(eStatus);
+        }
 }
 
 void executingAnd(command_t c)
