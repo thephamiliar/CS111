@@ -186,8 +186,8 @@ void executingSimple(command_t c)
 	else if (pid == 0) // child process
 	{	
 		setupInOut(c); // redirects inputs and outputs
-		if (strcmp(c->u.word[0],"exec") == 0)
-			execvp(c->u.word[1], c->u.word++);
+		if (strcmp(c->u.word[0],"exec") == 0) // special exception for exec
+			c->u.word++;
 		execvp(c->u.word[0], c->u.word); // execute commands
 		error(1, errno, "error with command execution\n"); // execvp shouldn't return unless error
 	}
