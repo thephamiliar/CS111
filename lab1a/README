@@ -1,24 +1,51 @@
-Jessica Pham 	004153744
+Jessica Pham 	004153744 
 Josh St Clair 	904187688
 
 LAB 1A 
-For part A, we were required to read in a file and create a command_stream struct. We first read in
-the file, parsed, and tokenized the file one line at a time. Then, we placed the tokens on two
-different stacks: an operations stack of enum command_types and a command stack or commands. Once
-these stacks were implemented, making the command_stream just required popping from the stacks and 
-linking the commands together.
+For part A, we were required to read in a file and create a
+command_stream struct. We first read in the file, parsed, and tokenized the file
+one line at a time. Then, we placed the tokens on two different stacks: an
+operations stack of enum command_types and a command stack or commands. Once
+these stacks were implemented, making the command_stream just required popping
+from the stacks and linking the commands together.
 
-While parsing, we had to take into account syntactical errors that could carry on to the next line.
-In order to accomplish this, we kept track of the number of parentheses, as well as special
-characters that may follow after a complete command. Once an error was found, an error report with
-the line number and type of error was printed out and the program exited.
+While parsing, we had to take into account syntactical errors that could carry
+on to the next line.  In order to accomplish this, we kept track of the number
+of parentheses, as well as special characters that may follow after a complete
+command. Once an error was found, an error report with the line number and type
+of error was printed out and the program exited.
 
-There are three types of commands in the command_stream. A simple command is just a command of words
-and redirections. A special command is formed by two commands, and a subshell command points to
-another command.
+There are three types of commands in the command_stream. A simple command is
+just a command of words and redirections. A special command is formed by two
+commands, and a subshell command points to another command.
 
-At the end of each complete command, we would make a tree from the stacks and returned a pointer to
-the first command. The command_stream is a linked lists of Nodes that point to the top of each
-complete command. The make_command_stream function returns the root Node that consists of the first
-complete command, and the read_command_stream returns the first node of the command_stream, and
-updates the new root to the next Node. 
+At the end of each complete command, we would make a tree from the stacks and
+returned a pointer to the first command. The command_stream is a linked lists of
+Nodes that point to the top of each complete command. The make_command_stream
+function returns the root Node that consists of the first complete command, and
+the read_command_stream returns the first node of the command_stream, and
+updates the new root to the next Node.
+
+LAB 1B 
+For part B, we were required to use our previous implementation from part A to
+interpret commands and simulate the shell's behavior. We accomplished this with
+an execution switch table that read the command type and acted appropriately.
+Commands that involved the operations AND, OR, SEQUENTIAL, and SUBSHELL
+simply called our base execution for a SIMPLE command and returned the
+appropriate status afterwards. The PIPE command required a little more work in
+its implementation using the fork() to create children to execute the pipe
+commands. The parent had to wait on the child processes to finish executing. In
+executing simple commands, we again forked a child that would use execvp() to
+execute the simple commands and let the parent wait for it. This was necessary
+because the execvp() method would not return if successful. We created a special
+exeception if the command exec was passed as a simple command. Given this
+command, we executed the command following exec as the main command and at
+Tuan's request, instead of letting the exec terminate the process, we let it
+continue processing further commands. We also used a helper function called
+setupInOut in order to help in the input and output redirections in commands.
+This utilized the dup2 function to copy file descriptors to stdin or stdout.
+
+One thing to note for our lab, for some reason, our make check stopped working
+even though we never changed anything in the file itself. We tested our code by
+running ./timetrash script.sh which contained our test cases. It appeared from
+the error message that make check was not creating the temp files correctly.
