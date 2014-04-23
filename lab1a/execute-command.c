@@ -261,4 +261,8 @@ execute_command (command_t c, bool time_travel)
 	{
 		execute_switch(c);
 	}
+	else // run processes in parallel
+	{
+		
+	}
 }
