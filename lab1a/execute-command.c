@@ -15,6 +15,9 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 
+//GLOBAL VARIABLES
+
+
 int
 command_status (command_t c)
 {
@@ -250,6 +253,40 @@ void executingSequence(command_t c)
     c->status = command_status(c->u.command[1]);
 }
 
+/* TIMETRAVEL FUNCTIONS*/
+void make_dependency_list (command_t c)
+{
+    //read command stream
+    //while 
+	//make depend node depend_t *dpd = (depend_t) checked_malloc(MAX_SIZE_ARRAY * sizeof(depend_t));
+	//if cmd->input != NULL
+		//new_dep->input = cmd->input
+	//else
+		//new_dep->input = cmd->u.word[], where word is not an option
+	//if input is in output list (most recent output)
+		//new_dep->dependency = old_dep->pid; 
+	//add to dependency list
+	return;
+}
+
+void execute_time_travel (command_t c)
+{
+   //make_dependency_list(c);
+   //while (there are still runnable commands) 
+	//for all nodes
+		//if curr_node->dependency != NULL
+			//continue; 
+		//fork()
+		//if child
+			//execute_cmd()
+			//exit
+		//else
+			//save child pid
+	//wait() = pid
+	//update dep, then run current command
+	return;
+}
+
 void
 execute_command (command_t c, bool time_travel)
 {
@@ -260,5 +297,9 @@ execute_command (command_t c, bool time_travel)
 	if (time_travel == false)
 	{
 		execute_switch(c);
+	}
+	else
+	{
+		execute_time_travel(c);
 	}
 }
