@@ -1,5 +1,8 @@
 // UCLA CS 111 Lab 1 command internals
 
+#include <stdlib.h> //for pid in dep_node
+#include <unistd.h>
+
 enum command_type
   {
     AND_COMMAND,         // A && B
@@ -47,3 +50,21 @@ struct cmd_node
     struct command *c;
     struct cmd_node *next;
 };
+
+// Node for dependency tree
+struct dep_node
+{
+    pid_t pid;
+    char **in;    
+    char **out;
+    int numOfInput;  // could be more than one input/output dependency
+    int numOfOutput; 
+    struct dep_node **dependency;
+    int numOfDependencies; 
+    bool isDone;    
+};
+
+// global array to access dependency nodes
+extern struct dep_node **dep_access;
+extern int numOfDepNodes;
+

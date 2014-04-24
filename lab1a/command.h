@@ -5,6 +5,7 @@
 typedef struct command *command_t;
 typedef struct command_stream *command_stream_t;
 typedef struct cmd_node *cmd_node_t;
+typedef struct dep_node *dep_node_t;
 
 /* Create a command stream from GETBYTE and ARG.  A reader of
    the command stream will invoke GETBYTE (ARG) to get the next byte.
