@@ -63,9 +63,12 @@ main (int argc, char **argv)
       else
 	{
 	  last_command = command;
+  	  //make dependency tree for time travel
 	  execute_command (command, time_travel);
 	}
     }
+    if (time_travel)
+	execute_time_travel();
 
   return print_tree || !last_command ? 0 : command_status (last_command);
 }

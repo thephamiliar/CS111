@@ -397,27 +397,62 @@ void addingSimpleToDN(command_t c, dep_node_t dn)
     }
 }
 
-void execute_time_travel (command_t c)
+command_t execute_time_travel (void)
 {
-   //make_dependency_list(c);
-   //while (there are still runnable commands) 
-	//for all nodes
-		//if curr_node->dependency != NULL
-			//continue; 
-		//fork()
-		//if child
-			//execute_cmd()
-			//exit
-		//else
-			//save child pid
-	//wait() = pid
-	//update dep, then run current command
-	return;
+   //while (there are still runnable commands)
+   int finishedNodes = 0;
+   while (finishedNodes < numOfDepNodes)
+   {
+	int i;
+	for (i = 0; i < numOfDepNodes; i++)
+	{
+  	    dep_node_t curr_node = dep_access[i];
+	    if (dep_access[i]->isDone == true)
+		continue;
+	    if (curr_node->numOfDependencies == 0 && curr_node->pid < 1)
+	    {
+	        pid_t pid = fork();
+	        if (pid < 0)
+	        {
+	            error(1, errno, "fork was unsuccessful\n");
+	        } else if (pid == 0) {
+		        //execute_switch(curr_node->cmd);
+			curr_node->isDone = true;
+			finishedNodes++;
+		        //_exit(curr_node->cmd->status);
+	        } else {
+		        curr_node->pid = pid;
+	        }
+	    }
+	}    
+	int status;
+        pid_t finished_pid = waitpid(-1, &status, 0);
+
+	//find finished pid and update dependency graph
+	dep_node_t finished_node = dep_access[0];
+	for (i = 0; i < numOfDepNodes; i++)
+	{
+	    if (finished_node->pid == finished_pid)
+	    {
+	   	int n;
+	    	for (n = 0; n < finished_node->numOfDependencies; n++)
+	   	{
+			if (finished_node->dependency[n]->isDone == false)
+				break;
+	   	}
+		if (n == finished_node->numOfDependencies)
+			finished_node->numOfDependencies = 0;
+	    }
+	    i++;
+	    finished_node = dep_access[i];
+	}    
+    }
 }
 
 // set default values for new dep node
 void init_dep_node(dep_node_t dn)
 {
+	dn->pid = -1;
 	dn->in = checked_malloc(dep_node_in_array_size * sizeof(char*));
 	if (dn->in == NULL)
 		error(1, 0, "Error with memory allocation\n");
@@ -509,6 +544,5 @@ execute_command(command_t c, bool time_travel)
 		// to run the time travel
 		if (TIME_DEBUG)
 			printf("TEST: SUCCESS FOR DEP NODE %d\n\n", numOfDepNodes);		
-		//execute_time_travel(c);
 	}
 }
