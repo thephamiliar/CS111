@@ -2,6 +2,7 @@
 
 #include "command.h"
 #include "command-internals.h"
+#include "alloc.h"
 
 #include <error.h>
 //additional #include
@@ -23,6 +24,7 @@ dep_node_t *dep_access = NULL;
 int numOfDepNodes = 0;
 #define DEP_NODE_ARRAY_GROW 64
 #define DEP_NODE_IO_ARRAY_GROW 8
+bool TIME_DEBUG = false; // use for debugging time trash
 
 // function prototypes for executing commands
 void executingSimple(command_t c);
@@ -41,7 +43,7 @@ void addingSequentialToDN(command_t c, dep_node_t dn);
 void init_dep_node(dep_node_t dn);
 void grow_in_ptr(dep_node_t dn);
 void grow_out_ptr(dep_node_t dn);
-void add_in_out(command_t c, dep_node_t dn);
+bool add_in_out(command_t c, dep_node_t dn);
 void setup_new_dep_node(void);
 void check_for_prev_dependencies(dep_node_t dn);
 
@@ -326,23 +328,29 @@ void grow_out_ptr(dep_node_t dn)
         dn->out = temp;
 }
 
-// add input and output from redirection to dep node
-void add_in_out(command_t c, dep_node_t dn)
+// add input and output from redirection to dep node, returns true if there was an input
+bool add_in_out(command_t c, dep_node_t dn)
 {
-    if (c->input != NULL)
-    {
-        dn->in[dn->numOfInput] = c->input;
-        dn->numOfInput++;
-        if (dn->numOfInput == dep_node_in_array_size)
-            grow_in_ptr(dn);
-    }
     if (c->output != NULL)
     {
         dn->out[dn->numOfOutput] = c->output;
         dn->numOfOutput++;
 	if (dn->numOfOutput == dep_node_out_array_size)
 	    grow_out_ptr(dn);
+	if (TIME_DEBUG)
+	    printf("TEST: output: %s\n", dn->out[dn->numOfOutput-1]);
     }
+    if (c->input != NULL)
+    {
+        dn->in[dn->numOfInput] = c->input;
+        dn->numOfInput++;
+        if (dn->numOfInput == dep_node_in_array_size)
+            grow_in_ptr(dn);
+	if (TIME_DEBUG)
+	    printf("TEST: input: %s\n", dn->in[dn->numOfInput-1]);
+        return true;
+    }
+    return false;
 }
 
 // for AND, OR, SEQUENTIAL, PIPE
@@ -361,23 +369,31 @@ void addingSubshellToDN(command_t c, dep_node_t dn)
 
 void addingSimpleToDN(command_t c, dep_node_t dn)
 {
-    add_in_out(c, dn); // add input and output files from redirection if any
-    int numOfWords = 0;
-    while(c->u.word[numOfWords] != NULL) // get other input files
-    {
-        if (numOfWords = 0) // skip the first word which is the command
-	{    
+    if (!add_in_out(c, dn)) // add input and output files from redirection if any, if input exists then true
+    {   		    // if no input, then check for input following command
+        int numOfWords = 0;
+        if(strcmp(c->u.word[numOfWords], "exec") == 0) // if exec is first command, skip it along with following command for inputs
+	    numOfWords += 2;
+        while(c->u.word[numOfWords] != '\0') // get other input files
+        {
+	    if (numOfWords == 0) // skip the first word which is the command
+	    {    
+	        numOfWords++;
+	        continue;
+	    }
+	    if(c->u.word[numOfWords][0] == '-') // ignore options
+    	    {
+	        numOfWords++;
+	        continue;
+   	    }
+            dn->in[dn->numOfInput] = c->u.word[numOfWords];
+            dn->numOfInput++;
 	    numOfWords++;
-	    continue;
-	}
-	if(c->u.word[numOfWords][0] == '-') // ignore options
-	{
-	    numOfWords++;
-	    continue;
-	}
-        dn->in[dn->numOfInput] = c->u.word[numOfWords];
-        dn->numOfInput++;
-	numOfWords++;
+	    if (TIME_DEBUG)
+	    	printf("TEST: input %s\n", dn->in[dn->numOfInput-1]);
+        }
+	if (TIME_DEBUG)
+		printf("TEST: addingSimpleToDN loop exited\n\n");
     }
 }
 
@@ -432,7 +448,7 @@ void setup_new_dep_node(void)
         if(numOfDepNodes == dep_node_array_size) // need to grow array for more dep nodes
         {
             dep_node_array_size += DEP_NODE_ARRAY_GROW;
-            dep_node_t temp = checked_realloc(dep_access, dep_node_array_size * sizeof(dep_node_t));
+            dep_node_t *temp = checked_realloc(dep_access, dep_node_array_size * sizeof(dep_node_t));
             if (temp == NULL)
                 error(1, 0, "Error with memory reallocation\n");
             dep_access = temp;
@@ -441,14 +457,13 @@ void setup_new_dep_node(void)
         if (dep_access[numOfDepNodes] == NULL)
             error(1, 0, "Error with memory allocation\n");
         init_dep_node(dep_access[numOfDepNodes]); // initialize dep node 
-        numOfDepNodes++;
 }
 
 // check previous dep nodes for input-output dependencies
 void check_for_prev_dependencies(dep_node_t dn)
 {
     int depNodeCount = numOfDepNodes-1; // counting backwards through all prev dep nodes
-    while (depNodeCount > 0)
+    while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
         int inputCount = 0;
 	int outputCount = 0;
@@ -460,6 +475,8 @@ void check_for_prev_dependencies(dep_node_t dn)
 		{
 		    dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		    dn->numOfDependencies++;
+		    if (TIME_DEBUG)
+			printf("TEST: Node %d has a dependcy on %d\n", numOfDepNodes+1, depNodeCount+1); 
 		}
 	        outputCount++;
 	    }
@@ -487,9 +504,11 @@ execute_command(command_t c, bool time_travel)
 		// the dep list needs to be created for all command streams before execute_time_travel can be run..
 		make_dependency_list(c, dep_access[numOfDepNodes]);
 	        check_for_prev_dependencies(dep_access[numOfDepNodes]);	
+		numOfDepNodes++;
 		// add some kind of loop to go through the streams again
 		// to run the time travel
-				
+		if (TIME_DEBUG)
+			printf("TEST: SUCCESS FOR DEP NODE %d\n\n", numOfDepNodes);		
 		//execute_time_travel(c);
 	}
 }

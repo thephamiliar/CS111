@@ -414,7 +414,7 @@ command_t make_simple_cmd (char* word)
     else
     {
         new_cmd->u.word[numOfWords] = curr_word;
-        new_cmd->u.word[numOfWords+1] = NULL;
+        new_cmd->u.word[numOfWords+1] = '\0';
     }
     if (DEBUG)
 	printf("Exiting simple command...\n");

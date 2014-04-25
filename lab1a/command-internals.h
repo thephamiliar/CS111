@@ -67,4 +67,3 @@ struct dep_node
 // global array to access dependency nodes
 extern struct dep_node **dep_access;
 extern int numOfDepNodes;
-
