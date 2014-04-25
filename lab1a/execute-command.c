@@ -24,7 +24,7 @@ dep_node_t *dep_access = NULL;
 int numOfDepNodes = 0;
 #define DEP_NODE_ARRAY_GROW 64
 #define DEP_NODE_IO_ARRAY_GROW 8
-bool TIME_DEBUG = false; // use for debugging time trash
+bool TIME_DEBUG = true; // use for debugging time trash
 
 // function prototypes for executing commands
 void executingSimple(command_t c);
@@ -40,11 +40,11 @@ void addingSubshellToDN(command_t c,  dep_node_t dn);
 void addingSequentialToDN(command_t c, dep_node_t dn);
 
 // helper functions for building a dep node
-void init_dep_node(dep_node_t dn);
+void init_dep_node(command_t c, dep_node_t dn);
 void grow_in_ptr(dep_node_t dn);
 void grow_out_ptr(dep_node_t dn);
 bool add_in_out(command_t c, dep_node_t dn);
-void setup_new_dep_node(void);
+void setup_new_dep_node(command_t c);
 void check_for_prev_dependencies(dep_node_t dn);
 
 int
@@ -389,6 +389,8 @@ void addingSimpleToDN(command_t c, dep_node_t dn)
             dn->in[dn->numOfInput] = c->u.word[numOfWords];
             dn->numOfInput++;
 	    numOfWords++;
+	    if (dn->numOfInput == dep_node_array_size)
+		grow_in_ptr(dn);
 	    if (TIME_DEBUG)
 	    	printf("TEST: input %s\n", dn->in[dn->numOfInput-1]);
         }
@@ -416,8 +418,9 @@ void execute_time_travel (command_t c)
 }
 
 // set default values for new dep node
-void init_dep_node(dep_node_t dn)
+void init_dep_node(command_t c, dep_node_t dn)
 {
+	dn->cmd = c;
 	dn->in = checked_malloc(dep_node_in_array_size * sizeof(char*));
 	if (dn->in == NULL)
 		error(1, 0, "Error with memory allocation\n");
@@ -435,7 +438,7 @@ void init_dep_node(dep_node_t dn)
 }
 
 // create dependency list for time traveling
-void setup_new_dep_node(void)
+void setup_new_dep_node(command_t c)
 {
         dep_node_in_array_size = DEP_NODE_IO_ARRAY_GROW; // reset IO memory allocations
         dep_node_out_array_size = DEP_NODE_IO_ARRAY_GROW;
@@ -456,13 +459,14 @@ void setup_new_dep_node(void)
         dep_access[numOfDepNodes] = checked_malloc(sizeof(struct dep_node));
         if (dep_access[numOfDepNodes] == NULL)
             error(1, 0, "Error with memory allocation\n");
-        init_dep_node(dep_access[numOfDepNodes]); // initialize dep node 
+        init_dep_node(c, dep_access[numOfDepNodes]); // initialize dep node 
 }
 
 // check previous dep nodes for input-output dependencies
 void check_for_prev_dependencies(dep_node_t dn)
 {
     int depNodeCount = numOfDepNodes-1; // counting backwards through all prev dep nodes
+    bool foundDep = false;
     while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
         int inputCount = 0;
@@ -476,13 +480,18 @@ void check_for_prev_dependencies(dep_node_t dn)
 		    dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		    dn->numOfDependencies++;
 		    if (TIME_DEBUG)
-			printf("TEST: Node %d has a dependcy on %d\n", numOfDepNodes+1, depNodeCount+1); 
+			printf("TEST: Node %d has a dependency on %d\n", numOfDepNodes+1, depNodeCount+1); 
+		    foundDep = true; // dependency found no need to process this node further
+		    break; 
 		}
 	        outputCount++;
 	    }
 	    inputCount++;
+	    if (foundDep)
+		break; // break out of node
 	}
 	depNodeCount--;
+	foundDep = false;
     }
 }
 
@@ -500,7 +509,7 @@ execute_command(command_t c, bool time_travel)
 	}
 	else
 	{
-		setup_new_dep_node();
+		setup_new_dep_node(c);
 		// the dep list needs to be created for all command streams before execute_time_travel can be run..
 		make_dependency_list(c, dep_access[numOfDepNodes]);
 	        check_for_prev_dependencies(dep_access[numOfDepNodes]);	
