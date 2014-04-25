@@ -7,6 +7,7 @@
 exec echo goodbye world 
 exec ls -a > ls.txt
 exec cat ls.txt > lscopy.txt
+cat < a.txt > c.txt
 
 ls -a > ls.txt
 echo start of this script && echo Line 1 good || echo Line 1 failed

@@ -4,7 +4,6 @@
 #include "command-internals.h"
 #include "alloc.h"
 
-#include <error.h>
 //additional #include
 #include <unistd.h>
 #include <error.h>
@@ -24,7 +23,7 @@ dep_node_t *dep_access = NULL;
 int numOfDepNodes = 0;
 #define DEP_NODE_ARRAY_GROW 64
 #define DEP_NODE_IO_ARRAY_GROW 8
-bool TIME_DEBUG = true; // use for debugging time trash
+bool TIME_DEBUG = false; // use for debugging time trash
 
 // function prototypes for executing commands
 void executingSimple(command_t c);
@@ -470,9 +469,9 @@ void check_for_prev_dependencies(dep_node_t dn)
     while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
         int inputCount = 0;
-	int outputCount = 0;
 	while (inputCount < dn->numOfInput)
 	{
+	    int outputCount = 0;
 	    while (outputCount < dep_access[depNodeCount]->numOfOutput)
 	    {
 	        if (strcmp(dn->in[inputCount], dep_access[depNodeCount]->out[outputCount]) == 0)
