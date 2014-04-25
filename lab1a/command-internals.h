@@ -55,6 +55,7 @@ struct cmd_node
 struct dep_node
 {
     pid_t pid;
+    struct command *cmd;
     char **in;    
     char **out;
     int numOfInput;  // could be more than one input/output dependency
