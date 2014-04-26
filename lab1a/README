@@ -69,3 +69,15 @@ and after a node was finished, it was checked against all the previous nodes to
 determine dependencies with them. The inputs and outputs of the current node
 were compared with the outputs of the previous nodes to deteremine dependencies.
 All the nodes were held in an array of pointers that pointed to node structs. 
+
+Once the dependency lists was made, we executed the parallelism by looping through
+the commands until we have executed all of them. Within this loop, we check all the 
+nodes for dependencies, and if they do not have any we execute them using a fork().
+While the command is being executed, we have the commands dependent on that process 
+wait until the process has been completed and then update dependency graph by marking
+the completed command as finished. Since the depedency list was structured as an array,
+we couldn't necessarily remove the dependencies from the list. To resolve this, we have 
+a loop that goes through the dependencies and sees whether all of the commands have finished.
+If the number of dependences matches the count, then we change the count to zero. 
+Once all of the node's dependencies have been run, then we can execute the command 
+and break out of the loop once all commands have been run.
