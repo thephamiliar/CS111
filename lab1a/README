@@ -49,3 +49,21 @@ One thing to note for our lab, for some reason, our make check stopped working
 even though we never changed anything in the file itself. We tested our code by
 running ./timetrash script.sh which contained our test cases. It appeared from
 the error message that make check was not creating the temp files correctly.
+
+LAB 1C
+For part C, we needed to first go through all the command streams and determine
+if there were dependencies between streams that would prevent parallelization.
+This included files that both wrote to the same file or where one file wrote to a
+file that another one was reading to. Basically any time where we were writing
+to a file, that created a dependency. Using the same sort of recursive algorithm
+as in part B, we had the execution for the SIMPLE commands be our base case and
+had the other commands (AND, OR, SEQUENTIAL, PIPE, SUBSHELL) simply call the
+SIMPLE command to execute their sub-commands. Each node had its own id, a
+pointer to the first command that it executed, pointers to the files the stream
+inputed and outputed, counters to keep track of how many files were inputed and
+outputed, an array of pointers to other nodes it was dependent on, a counter to
+keep track of how many nodes it was dependent on, and a bool value to say if that
+node had finished executing its commands when parallelizing and executing. As
+every stream came in, the node was created with all the commands in that stream
+and after a node was finished, it was checked against all the previous nodes to
+determine dependencies with those. 

@@ -565,10 +565,6 @@ void check_for_prev_dependencies(dep_node_t dn)
 void
 execute_command(command_t c, bool time_travel)
 {
-   /*FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  
-    */
 	if (time_travel == false)
 	{
 		execute_switch(c);
@@ -576,12 +572,10 @@ execute_command(command_t c, bool time_travel)
 	else
 	{
 		setup_new_dep_node(c);
-		// the dep list needs to be created for all command streams before execute_time_travel can be run..
+		// the dep list needs to be created for all command streams before execute_time_travel can be run
 		make_dependency_list(c, dep_access[numOfDepNodes]);
 	        check_for_prev_dependencies(dep_access[numOfDepNodes]);	
 		numOfDepNodes++;
-		// add some kind of loop to go through the streams again
-		// to run the time travel
 		if (TIME_DEBUG)
 			printf("TEST: SUCCESS FOR DEP NODE %d\n\n", numOfDepNodes);		
 	}
