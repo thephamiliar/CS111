@@ -35,3 +35,13 @@ cmp b.txt a.txt && echo All tests were successful > d.txt
 echo Hello World
 
 echo Should be dependent on Node 1 and 4 > c.txt
+
+echo first
+
+echo second
+
+echo third
+
+echo fourth: testing order of execution for non-dependent nodes
+
+echo fifth

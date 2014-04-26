@@ -503,33 +503,59 @@ void check_for_prev_dependencies(dep_node_t dn)
     bool foundDep = false;
     while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
-	// first check nodes for reading-writing dependencies
-        int inputCount = 0;
-	int outputCount = 0;
-	while (inputCount < dn->numOfInput)
+	// first check nodes for Reading After Writing dependencies
+        int currentNodeInputCount = 0;
+	while (currentNodeInputCount < dn->numOfInput)
 	{
 	    int otherNodeOutputCount = 0;
 	    while (otherNodeOutputCount < dep_access[depNodeCount]->numOfOutput)
 	    {
 	        if (TIME_DEBUG)
-                        printf("TEST: In-Out comparing: %s vs. %s\n", dn->in[inputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
-		if (strcmp(dn->in[inputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]) == 0)
+                        printf("TEST: RAW comparing: %s vs. %s\n", dn->in[currentNodeInputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
+		if (strcmp(dn->in[currentNodeInputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]) == 0)
 		{
 		    dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		    dn->numOfDependencies++;
 		    if (TIME_DEBUG)
-			printf("TEST: Node %d has a dependency on %d\n", numOfDepNodes+1, depNodeCount+1); 
+			printf("TEST: Node %d has a RAW dependency on %d\n", numOfDepNodes+1, depNodeCount+1); 
 		    foundDep = true; // dependency found no need to process this node further
 		    break; 
 		}
 	        otherNodeOutputCount++;
 	    }
-	    inputCount++;
+	    currentNodeInputCount++;
    	    if (foundDep)
 		break; // break out of node
 	}
-
-	// if no RW dependencies then check for write-write dependencies
+	// if no RAW dependencies then check for Writing After Reading dependencies
+        if (!foundDep)
+        {
+            int currentNodeOutputCount = 0;
+            while (currentNodeOutputCount < dn->numOfOutput)
+            {
+                int otherNodeInputCount = 0;
+                while (otherNodeInputCount < dep_access[depNodeCount]->numOfInput)
+                {
+                    if (TIME_DEBUG)
+                        printf("TEST: WAR comparing: %s vs. %s\n", dn->out[currentNodeOutputCount], dep_access[depNodeCount]->in[otherNodeInputCount]);
+                    if (strcmp(dn->out[currentNodeOutputCount], dep_access[depNodeCount]->in[otherNodeInputCount]) == 0)
+                    {
+                        dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
+                        dn->numOfDependencies++;
+                        if (TIME_DEBUG)
+                            printf("TEST: Node %d has a WAR dependency on %d\n", numOfDepNodes+1, depNodeCount+1);
+                        foundDep = true; // dependency found no need to process this node further
+                        break;
+                    }
+                    otherNodeInputCount++;
+                }       
+                currentNodeOutputCount++;
+                if (foundDep)
+                    break; // break out of node
+            }
+        }
+	
+	// if no RAW nor WAR dependencies then check for Writing After Writing dependencies
 	if (!foundDep)
 	{
 	    int currentNodeOutputCount = 0;
@@ -539,13 +565,13 @@ void check_for_prev_dependencies(dep_node_t dn)
 	        while (otherNodeOutputCount < dep_access[depNodeCount]->numOfOutput)
 	        {
 		    if (TIME_DEBUG)
-			printf("TEST: Outputs comparing: %s vs. %s\n", dn->out[currentNodeOutputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
+			printf("TEST: WAW comparing: %s vs. %s\n", dn->out[currentNodeOutputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
 		    if (strcmp(dn->out[currentNodeOutputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]) == 0)
 		    {
 		        dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		        dn->numOfDependencies++;
 		        if (TIME_DEBUG)
-		            printf("TEST: Node %d has a dependency on %d\n", numOfDepNodes+1, depNodeCount+1);
+		            printf("TEST: Node %d has a WAW dependency on %d\n", numOfDepNodes+1, depNodeCount+1);
 		        foundDep = true; // dependency found no need to process this node further
 		        break;
 		    }
