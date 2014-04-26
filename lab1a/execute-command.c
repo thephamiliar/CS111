@@ -388,7 +388,7 @@ void addingSimpleToDN(command_t c, dep_node_t dn)
             dn->in[dn->numOfInput] = c->u.word[numOfWords];
             dn->numOfInput++;
 	    numOfWords++;
-	    if (dn->numOfInput == dep_node_array_size)
+	    if (dn->numOfInput == dep_node_in_array_size)
 		grow_in_ptr(dn);
 	    if (TIME_DEBUG)
 	    	printf("TEST: input %s\n", dn->in[dn->numOfInput-1]);
@@ -468,13 +468,16 @@ void check_for_prev_dependencies(dep_node_t dn)
     bool foundDep = false;
     while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
+	// first check nodes for reading-writing dependencies
         int inputCount = 0;
 	while (inputCount < dn->numOfInput)
 	{
-	    int outputCount = 0;
-	    while (outputCount < dep_access[depNodeCount]->numOfOutput)
+	    int otherNodeOutputCount = 0;
+	    while (otherNodeOutputCount < dep_access[depNodeCount]->numOfOutput)
 	    {
-	        if (strcmp(dn->in[inputCount], dep_access[depNodeCount]->out[outputCount]) == 0)
+	        if (TIME_DEBUG)
+                        printf("TEST: In-Out comparing: %s vs. %s\n", dn->in[inputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
+		if (strcmp(dn->in[inputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]) == 0)
 		{
 		    dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		    dn->numOfDependencies++;
@@ -483,11 +486,39 @@ void check_for_prev_dependencies(dep_node_t dn)
 		    foundDep = true; // dependency found no need to process this node further
 		    break; 
 		}
-	        outputCount++;
+	        otherNodeOutputCount++;
 	    }
 	    inputCount++;
 	    if (foundDep)
 		break; // break out of node
+	}
+
+	// if no RW dependencies then check for write-write dependencies
+	if (!foundDep)
+	{
+	    int currentNodeOutputCount = 0;
+	    while (currentNodeOutputCount < dn->numOfOutput)
+	    {
+	        int otherNodeOutputCount = 0;
+	        while (otherNodeOutputCount < dep_access[depNodeCount]->numOfOutput)
+	        {
+		    if (TIME_DEBUG)
+			printf("TEST: Outputs comparing: %s vs. %s\n", dn->out[currentNodeOutputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]);
+		    if (strcmp(dn->out[currentNodeOutputCount], dep_access[depNodeCount]->out[otherNodeOutputCount]) == 0)
+		    {
+		        dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
+		        dn->numOfDependencies++;
+		        if (TIME_DEBUG)
+		            printf("TEST: Node %d has a dependency on %d\n", numOfDepNodes+1, depNodeCount+1);
+		        foundDep = true; // dependency found no need to process this node further
+		        break;
+		    }
+	            otherNodeOutputCount++;
+	        }	
+	        currentNodeOutputCount++;
+	        if (foundDep)
+		    break; // break out of node
+	    }
 	}
 	depNodeCount--;
 	foundDep = false;
