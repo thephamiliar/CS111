@@ -54,7 +54,7 @@ struct cmd_node
 // Node for dependency tree
 struct dep_node
 {
-    pid_t pid;
+    int pid;
     struct command *cmd;
     char **in;    
     char **out;

@@ -40,11 +40,11 @@ void addingSubshellToDN(command_t c,  dep_node_t dn);
 void addingSequentialToDN(command_t c, dep_node_t dn);
 
 // helper functions for building a dep node
-void init_dep_node(dep_node_t dn);
+void init_dep_node(command_t c, dep_node_t dn);
 void grow_in_ptr(dep_node_t dn);
 void grow_out_ptr(dep_node_t dn);
 bool add_in_out(command_t c, dep_node_t dn);
-void setup_new_dep_node(void);
+void setup_new_dep_node(command_t c);
 void check_for_prev_dependencies(dep_node_t dn);
 
 int
@@ -295,17 +295,6 @@ void make_dependency_list (command_t c, dep_node_t dn)
         default:
                 error(1, 0, "Not a valid command\n");     
      }     
-    //read command stream
-    //while 
-	//make depend node depend_t *dpd = (depend_t) checked_malloc(MAX_SIZE_ARRAY * sizeof(depend_t));
-	//if cmd->input != NULL
-		//new_dep->input = cmd->input
-	//else
-		//new_dep->input = cmd->u.word[], where word is not an option
-	//if input is in output list (most recent output)
-		//new_dep->dependency = old_dep->pid; 
-	//add to dependency list
-	return;
 }
 
 // increase array size for dep node input files
@@ -389,6 +378,8 @@ void addingSimpleToDN(command_t c, dep_node_t dn)
             dn->in[dn->numOfInput] = c->u.word[numOfWords];
             dn->numOfInput++;
 	    numOfWords++;
+	    if (dn->numOfInput == dep_node_array_size)
+		grow_in_ptr(dn);
 	    if (TIME_DEBUG)
 	    	printf("TEST: input %s\n", dn->in[dn->numOfInput-1]);
         }
@@ -397,7 +388,7 @@ void addingSimpleToDN(command_t c, dep_node_t dn)
     }
 }
 
-command_t execute_time_travel (void)
+void execute_time_travel (void)
 {
    //while (there are still runnable commands)
    int finishedNodes = 0;
@@ -407,51 +398,62 @@ command_t execute_time_travel (void)
 	for (i = 0; i < numOfDepNodes; i++)
 	{
   	    dep_node_t curr_node = dep_access[i];
-	    if (dep_access[i]->isDone == true)
+	    if (curr_node->isDone == true)
+	    {
 		continue;
+	    }
 	    if (curr_node->numOfDependencies == 0 && curr_node->pid < 1)
 	    {
-	        pid_t pid = fork();
+	        int pid = fork();
 	        if (pid < 0)
 	        {
 	            error(1, errno, "fork was unsuccessful\n");
 	        } else if (pid == 0) {
-		        //execute_switch(curr_node->cmd);
-			curr_node->isDone = true;
-			finishedNodes++;
-		        //_exit(curr_node->cmd->status);
+		        execute_switch(curr_node->cmd);
+		        _exit(curr_node->cmd->status);
 	        } else {
 		        curr_node->pid = pid;
 	        }
 	    }
 	}    
+	//wait for pid and update dependency graph
 	int status;
         pid_t finished_pid = waitpid(-1, &status, 0);
+	dep_node_t finished_node;
 
-	//find finished pid and update dependency graph
-	dep_node_t finished_node = dep_access[0];
+	//mark finished pid as done
 	for (i = 0; i < numOfDepNodes; i++)
 	{
+	    finished_node = dep_access[i];
 	    if (finished_node->pid == finished_pid)
 	    {
-	   	int n;
-	    	for (n = 0; n < finished_node->numOfDependencies; n++)
-	   	{
-			if (finished_node->dependency[n]->isDone == false)
-				break;
-	   	}
-		if (n == finished_node->numOfDependencies)
-			finished_node->numOfDependencies = 0;
+		finishedNodes++;
+		finished_node->isDone = true;
 	    }
-	    i++;
+	}
+
+	//find nodes dependent on finished node and update
+	for (i = 0; i < numOfDepNodes; i++)
+	{
 	    finished_node = dep_access[i];
-	}    
+	    int n;
+	    for (n = 0; n < finished_node->numOfDependencies; n++)
+	    {
+		if (finished_node->dependency[n]->isDone == false)
+			break;
+	    }
+	    if (n == finished_node->numOfDependencies)
+		    finished_node->numOfDependencies = 0;
+	    finished_node = dep_access[i];
+	}
+
     }
 }
 
 // set default values for new dep node
-void init_dep_node(dep_node_t dn)
+void init_dep_node(command_t c, dep_node_t dn)
 {
+	dn->cmd = c;
 	dn->pid = -1;
 	dn->in = checked_malloc(dep_node_in_array_size * sizeof(char*));
 	if (dn->in == NULL)
@@ -470,7 +472,7 @@ void init_dep_node(dep_node_t dn)
 }
 
 // create dependency list for time traveling
-void setup_new_dep_node(void)
+void setup_new_dep_node(command_t c)
 {
         dep_node_in_array_size = DEP_NODE_IO_ARRAY_GROW; // reset IO memory allocations
         dep_node_out_array_size = DEP_NODE_IO_ARRAY_GROW;
@@ -491,13 +493,14 @@ void setup_new_dep_node(void)
         dep_access[numOfDepNodes] = checked_malloc(sizeof(struct dep_node));
         if (dep_access[numOfDepNodes] == NULL)
             error(1, 0, "Error with memory allocation\n");
-        init_dep_node(dep_access[numOfDepNodes]); // initialize dep node 
+        init_dep_node(c, dep_access[numOfDepNodes]); // initialize dep node 
 }
 
 // check previous dep nodes for input-output dependencies
 void check_for_prev_dependencies(dep_node_t dn)
 {
     int depNodeCount = numOfDepNodes-1; // counting backwards through all prev dep nodes
+    bool foundDep = false;
     while (depNodeCount > -1) // node can be in position 0 of dep_access
     {
         int inputCount = 0;
@@ -511,13 +514,18 @@ void check_for_prev_dependencies(dep_node_t dn)
 		    dn->dependency[dn->numOfDependencies] = dep_access[depNodeCount];
 		    dn->numOfDependencies++;
 		    if (TIME_DEBUG)
-			printf("TEST: Node %d has a dependcy on %d\n", numOfDepNodes+1, depNodeCount+1); 
+			printf("TEST: Node %d has a dependency on %d\n", numOfDepNodes+1, depNodeCount+1); 
+		    foundDep = true; // dependency found no need to process this node further
+		    break; 
 		}
 	        outputCount++;
 	    }
 	    inputCount++;
+   	    if (foundDep)
+		break; // break out of node
 	}
 	depNodeCount--;
+	foundDep = false;
     }
 }
 
@@ -535,7 +543,7 @@ execute_command(command_t c, bool time_travel)
 	}
 	else
 	{
-		setup_new_dep_node();
+		setup_new_dep_node(c);
 		// the dep list needs to be created for all command streams before execute_time_travel can be run..
 		make_dependency_list(c, dep_access[numOfDepNodes]);
 	        check_for_prev_dependencies(dep_access[numOfDepNodes]);	
