@@ -66,4 +66,6 @@ keep track of how many nodes it was dependent on, and a bool value to say if tha
 node had finished executing its commands when parallelizing and executing. As
 every stream came in, the node was created with all the commands in that stream
 and after a node was finished, it was checked against all the previous nodes to
-determine dependencies with those. 
+determine dependencies with them. The inputs and outputs of the current node
+were compared with the outputs of the previous nodes to deteremine dependencies.
+All the nodes were held in an array of pointers that pointed to node structs. 
