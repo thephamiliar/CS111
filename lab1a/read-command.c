@@ -95,12 +95,18 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
             i++;
         else if (isSpecial(c))
         {
-            if (isSpecial(b)) //error: two special characters unless &, |
+            if (isSpecial(b)) //error: two special characters unless &, | or < > if lab1a design lab
             {
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
-            else if ((c == '&' && d == '&') || (c == '|' && d == '|'))
+            else if ((c == '&' && d == '&') 
+		  || (c == '|' && d == '|')
+		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
+		  || (c == '<' && d == '&') 
+		  || (c == '>' && d == '&') 
+		  || (c == '<' && d == '>')
+		  || (c == '>' && d == '|'))
                 i+=2;
             else if (c == '&') // single & is error
             {
@@ -122,10 +128,15 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     }
     while ((i > 0) && (linePos[i-1] == ' ' || linePos[i-1] == '\t')) //get rid of white space at the end
         i--;
-    if (i > 0 && (linePos[i-1] == '<' || linePos[i-1] == '>')) //error: line can't end in < or >
+    if (i > 0)
     {
-        fprintf(stderr, "%d: Error, cannot end line in < or >\n", lineNum);
-        exit(1);
+        char b = linePos[i-1];
+        if (b == '<' || b == '>'    // error: line can't end in redirection
+       || ((b == '&' || b == '|') && (i-1) > 0 && (linePos[i-2] == '<' || linePos[i-2] == '>'))) // Design Lab addition
+        {
+            fprintf(stderr, "%d: Error, cannot end line in redirection\n", lineNum);
+            exit(1);
+        }
     }
     return true;
 }
