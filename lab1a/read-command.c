@@ -22,6 +22,7 @@ bool isWordChar (char c);
 bool isSpecial (char c);
 bool parenCountCheck(char c, int *parenCount, const int lineNum);
 bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum);
+int charToInt (char c);
 //STACK FUNCTIONS
 void pushCMD (command_t* cmdStack, int* cmdSize, command_t cmd);
 void pushOP (enum command_type opStack[], int* opSize, enum command_type type);
@@ -33,7 +34,6 @@ command_t make_simple_cmd (char* word);
 command_t make_special_cmd (command_t left, command_t right, enum command_type type);
 command_t make_subshell_cmd (command_t cmd);
 command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
-//MEMORY FUNCTIONS
 
 
 
@@ -141,6 +141,11 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     return true;
 }
 
+int charToInt (char c)
+{
+    return (c-'0')%48;
+}
+
 /* PUSHCMD and PUSHOP: push items onto stacks */
 void pushCMD (command_t* cmdStack, int* cmdSize, command_t cmd)
 {
@@ -184,9 +189,20 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	    } else {
 		if (sizeOfWord > 0)
 		{
-	   	word[sizeOfWord] = '\0';
-	    	command_t cmd = make_simple_cmd(word);
-		pushCMD (cmdStack, cmdSize, cmd);
+		    // >| OPERATOR
+		    if (s[(*index)-1] == '>')
+		    {
+			sizeOfWord = sizeOfWord-1;
+	   	    	word[sizeOfWord] = '\0';
+	    	  	command_t cmd = make_simple_cmd(word);
+		   	pushCMD (cmdStack, cmdSize, cmd);
+			cmdStack[*cmdSize-1]->pipe = false;
+		    }
+		    // PIPE COMMAND
+	   	    word[sizeOfWord] = '\0';
+	    	    command_t cmd = make_simple_cmd(word);
+		    pushCMD (cmdStack, cmdSize, cmd);
+		    cmdStack[*cmdSize-1]->pipe = true;
 		}
 	    	//push 'PIPE' onto op stack
 		pushOP(opStack, opSize, PIPE_COMMAND);
@@ -242,6 +258,13 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	}
 	else if (s[(*index)] == '&')
 	{
+	    if (s[(*index)-1] == '>' || s[(*index)-1] == '<')
+	    {
+	        word[sizeOfWord]=s[(*index)];
+	   	sizeOfWord++;
+		(*index) = (*index)+1;
+		continue;
+	    }
 	    if (sizeOfWord > 0)
 	    {
 	   	 //push word onto cmd stack as simple command
@@ -357,9 +380,18 @@ command_t make_simple_cmd (char* word)
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.word = (char**) checked_malloc(MAX_SIZE_ARRAY*sizeof(char*));
     int i = 0; int numOfWords = 0; int numOfChars = 0;
     char *curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+
     while (word[i] != '\0')
     {
 	if ((word[i] == ' ' || word[i] == '\t' || word[i] == '<' || word[i] == '>') && numOfChars != 0)
@@ -372,40 +404,150 @@ command_t make_simple_cmd (char* word)
 	if (word[i] == '<')
 	{
 	    i++;
-	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	    // <& operator
+	    if (word[i] == '&')
 	    {
-		if (word[i] != ' ' && word[i] != '\t')
+		if (isdigit(word[i-2]))
 		{
-		     curr_word[numOfChars] = word[i];
-		     numOfChars++;
+			new_cmd->fd_n = charToInt(word[i-2]);
+			numOfWords--;
 		}
+		else
+			new_cmd->fd_n = 0;
 		i++;
+		while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input word or digit
+		if (numOfChars == 2 && isdigit(curr_word[0]))
+			new_cmd->digit_ifd = charToInt(curr_word[0]);
+		else
+	  		new_cmd->word_ifd = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
 	    }
-            curr_word[numOfChars] = '\0';
-	    //input
-	   new_cmd->input = curr_word; 
-           curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
-	   numOfChars=0;
-	   continue;
+	    // <> operator
+	    else if (word[i] == '>')
+	    {
+		if (isdigit(word[i-2]))
+			new_cmd->fd_n = charToInt(word[i-2]);
+		else
+			new_cmd->fd_n = 0;
+		
+	    }
+	    // simple < operator
+	    else {
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input
+	  	 new_cmd->input = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+	   }
 	}
 	if (word[i] == '>')
 	{
 	    i++;
-	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	    // >> operator
+	    if (word[i] == '>')
 	    {
-		if (word[i] != ' ' && word[i] != '\t')
-		{
-		     curr_word[numOfChars] = word[i];
-		     numOfChars++;
+		//check for options
+		if (strcmp(new_cmd->u.word[numOfWords-1],"-b") == 0)
+	        {
+			numOfWords = numOfWords-1;
+			new_cmd->u.word[numOfWords] = '\0';
+			new_cmd->append = 2;
 		}
-		i++;
+		else if (strcmp(new_cmd->u.word[numOfWords-1],"-e") == 0)
+		{
+			numOfWords = numOfWords-1;
+			new_cmd->u.word[numOfWords] = '\0';
+			new_cmd->append = 1;
+	        }
+		else
+		{
+			new_cmd->append = 1;
+		}
+		//output
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+		  	   curr_word[numOfChars] = word[i];
+		   	  numOfChars++;
+			}
+			i++;
+	  	  }
+	   	 curr_word[numOfChars] = '\0';	
+	    	//output
+	   	new_cmd->output = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+ 	  	 continue;
 	    }
-	    curr_word[numOfChars] = '\0';	
-	    //output
-	   new_cmd->output = curr_word; 
-           curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
-	   numOfChars=0;
- 	   continue;
+	    // >& operator
+	    else if (word[i] == '&')
+	    {
+		if (isdigit(word[i-2]))
+	  	{
+			new_cmd->fd_n = charToInt(word[i-2]);
+			numOfWords--;
+		}
+		else
+			new_cmd->fd_n = 1;
+		i++;
+		while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input word or digit
+		if (numOfChars == 2 && isdigit(curr_word[0]))
+			new_cmd->digit_ofd = charToInt(curr_word[0]);
+		else
+	  		new_cmd->word_ofd = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+		
+	    }
+	    // simple > operator
+	    else {
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+		  	   curr_word[numOfChars] = word[i];
+		   	  numOfChars++;
+			}
+			i++;
+	  	  }
+	   	 curr_word[numOfChars] = '\0';	
+	    	//output
+	   	new_cmd->output = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+ 	  	 continue;
+	   }
 	}
 	else
 	{
@@ -442,6 +584,14 @@ command_t make_special_cmd (command_t left, command_t right, enum command_type t
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.command[0] = left;
     new_cmd->u.command[1] = right;
     if(DEBUG)
@@ -459,6 +609,14 @@ command_t make_subshell_cmd(command_t cmd)
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.subshell_command = cmd;
     if(DEBUG)
 	printf("Exiting special command...\n");
@@ -590,7 +748,7 @@ make_command_stream (int (*get_next_byte) (void *),
 			stream[sizeOfStream] = '\0';
 
 			//pass stream and parenCount into syntax checker
-			isSyntaxGood(stream, &parenCount, line);
+			//isSyntaxGood(stream, &parenCount, line);
 			if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
 			{
 				stream[sizeOfStream] = ';';

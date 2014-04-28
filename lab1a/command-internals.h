@@ -14,6 +14,16 @@ enum command_type
     SUBSHELL_COMMAND2,	 // )
   };
 
+enum redirection_type
+  {
+    SIMPLE_IN,		// A < B
+    SIMPLE_OUT,		// A > B
+    CONCAT_OUT,		// A >> B
+    IN_AMP,		// A<&B
+    OUT_AMP,		// A>&B
+    IN_OUT,		// A<>B
+  };
+
 // Data associated with a command.
 struct command
 {
@@ -25,6 +35,27 @@ struct command
   // I/O redirections, or null if none.
   char *input;
   char *output;
+  /* append field determines whether to
+	0: overwrite
+	1: append
+	2: prepend 		     */
+  int append;
+  /* I/O file descriptors
+	[fd_n]<&word_ifd
+	[fd_n]>&word_ofd
+	[fd_n]<&digit_ifd
+	[fd_n]>&digit_ofd
+				     */
+  int fd_n;
+  char* word_ifd;
+  char* word_ofd;
+  int digit_ifd;
+  int digit_ofd;
+  /* pipe = true
+     >| = false; 		     */
+  enum redirection_type *redir_array;
+  int numOfRedir;
+  bool pipe;
 
   union
   {
