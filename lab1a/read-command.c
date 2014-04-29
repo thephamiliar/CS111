@@ -84,7 +84,29 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
         fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
     }
-    i++;
+    char d = linePos[i+1]; // special case for Design Lab 1a, for defaulted inputs
+    if (c == '<')
+    {
+        if(d == '&' || d == '>')
+            i+=2;
+        else    // if redirection starts the line without being special then error
+        {
+            fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
+            exit(1);
+        }
+    }
+    else if (c == '>')
+    {
+        if(d == '>' || d == '&' || d == '|')
+                i+=2;
+        else    // if redirection starts the line without being special then error
+        {
+            fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
+            exit(1);
+        }
+    }
+    else
+        i++;
     while(linePos[i] != '\0')
     {
         c = linePos[i];     //speed up accesses in rest of function
@@ -100,11 +122,7 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
-<<<<<<< HEAD
-           else if ((c == '&' && d == '&') 
-=======
             else if ((c == '&' && d == '&') 
->>>>>>> d9c06fa0c30e698e7e9346bbcc9efaccc2be2976
 		  || (c == '|' && d == '|')
 		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
 		  || (c == '<' && d == '&') 
