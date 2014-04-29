@@ -100,11 +100,7 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
-<<<<<<< HEAD
-            else if ((c == '&' && d == '&') 
-=======
            else if ((c == '&' && d == '&') 
->>>>>>> design
 		  || (c == '|' && d == '|')
 		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
 		  || (c == '<' && d == '&') 
