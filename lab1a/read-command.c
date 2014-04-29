@@ -79,7 +79,7 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     while ((linePos[i] == ' ') || (linePos[i] == '\t'))
         i++;
     char c = linePos[i];
-    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum))
+    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum) && c != '<' && c!='>')
     {
         fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
@@ -95,12 +95,18 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
             i++;
         else if (isSpecial(c))
         {
-            if (isSpecial(b)) //error: two special characters unless &, |
+            if (isSpecial(b)) //error: two special characters unless &, | or < > if lab1a design lab
             {
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
-            else if ((c == '&' && d == '&') || (c == '|' && d == '|'))
+           else if ((c == '&' && d == '&') 
+		  || (c == '|' && d == '|')
+		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
+		  || (c == '<' && d == '&') 
+		  || (c == '>' && d == '&') 
+		  || (c == '<' && d == '>')
+		  || (c == '>' && d == '|'))
                 i+=2;
             else if (c == '&') // single & is error
             {
@@ -122,10 +128,15 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     }
     while ((i > 0) && (linePos[i-1] == ' ' || linePos[i-1] == '\t')) //get rid of white space at the end
         i--;
-    if (i > 0 && (linePos[i-1] == '<' || linePos[i-1] == '>')) //error: line can't end in < or >
+    if (i > 0)
     {
-        fprintf(stderr, "%d: Error, cannot end line in < or >\n", lineNum);
-        exit(1);
+        char b = linePos[i-1];
+        if (b == '<' || b == '>'    // error: line can't end in redirection
+       || ((b == '&' || b == '|') && (i-1) > 0 && (linePos[i-2] == '<' || linePos[i-2] == '>'))) // Design Lab addition
+        {
+            fprintf(stderr, "%d: Error, cannot end line in redirection\n", lineNum);
+            exit(1);
+        }
     }
     return true;
 }
@@ -517,7 +528,6 @@ command_t make_simple_cmd (char* word)
 	  		new_cmd->word_ofd = curr_word; 
            	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
 	   	numOfChars=0;
-		
 	    }
 	    // simple > operator
 	    else {
@@ -686,7 +696,6 @@ make_command_stream (int (*get_next_byte) (void *),
 			c=get_next_byte(get_next_byte_argument);
 			continue;
 		}
-		line++;
 	     newLine = 0;
  	}
 	if (c == '\n') //CHECK FOR DOUBLE NEWLINES, HAVE TO MAKE NEW STACKS 
@@ -728,16 +737,14 @@ make_command_stream (int (*get_next_byte) (void *),
 		//reset stacks
 		opSize = 0; cmdSize = 0; endToken = false;
 		cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
-//	   	printf("COMMAND STREAM\n");print(root);
 	    }
 	    else
 	    {
 		if (sizeOfStream > 0)
 		{
 			stream[sizeOfStream] = '\0';
-
 			//pass stream and parenCount into syntax checker
-			//isSyntaxGood(stream, &parenCount, line);
+			isSyntaxGood(stream, &parenCount, line);
 			if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
 			{
 				stream[sizeOfStream] = ';';
