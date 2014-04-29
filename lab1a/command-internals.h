@@ -45,17 +45,14 @@ struct command
 	[fd_n]>&word_ofd
 	[fd_n]<&digit_ifd
 	[fd_n]>&digit_ofd
+	[fd_n]<>open_fd
 				     */
   int fd_n;
   char* word_ifd;
   char* word_ofd;
   int digit_ifd;
   int digit_ofd;
-  /* pipe = true
-     >| = false; 		     */
-  enum redirection_type *redir_array;
-  int numOfRedir;
-  bool pipe;
+  char* open_fd;
 
   union
   {
