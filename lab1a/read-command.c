@@ -79,7 +79,7 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     while ((linePos[i] == ' ') || (linePos[i] == '\t'))
         i++;
     char c = linePos[i];
-    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum))
+    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum) && c != '<' && c!='>')
     {
         fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
@@ -100,7 +100,11 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
+<<<<<<< HEAD
             else if ((c == '&' && d == '&') 
+=======
+           else if ((c == '&' && d == '&') 
+>>>>>>> design
 		  || (c == '|' && d == '|')
 		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
 		  || (c == '<' && d == '&') 
@@ -528,7 +532,6 @@ command_t make_simple_cmd (char* word)
 	  		new_cmd->word_ofd = curr_word; 
            	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
 	   	numOfChars=0;
-		
 	    }
 	    // simple > operator
 	    else {
@@ -697,7 +700,6 @@ make_command_stream (int (*get_next_byte) (void *),
 			c=get_next_byte(get_next_byte_argument);
 			continue;
 		}
-		line++;
 	     newLine = 0;
  	}
 	if (c == '\n') //CHECK FOR DOUBLE NEWLINES, HAVE TO MAKE NEW STACKS 
@@ -739,16 +741,14 @@ make_command_stream (int (*get_next_byte) (void *),
 		//reset stacks
 		opSize = 0; cmdSize = 0; endToken = false;
 		cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
-//	   	printf("COMMAND STREAM\n");print(root);
 	    }
 	    else
 	    {
 		if (sizeOfStream > 0)
 		{
 			stream[sizeOfStream] = '\0';
-
 			//pass stream and parenCount into syntax checker
-			//isSyntaxGood(stream, &parenCount, line);
+			isSyntaxGood(stream, &parenCount, line);
 			if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
 			{
 				stream[sizeOfStream] = ';';
