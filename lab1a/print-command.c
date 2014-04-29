@@ -14,35 +14,14 @@ command_indented_print (int indent, command_t c)
     case AND_COMMAND:
     case SEQUENCE_COMMAND:
     case OR_COMMAND:
+    case PIPE_COMMAND:
       {
 	command_indented_print (indent + 2 * (c->u.command[0]->type != c->type),
 				c->u.command[0]);
-	static char const command_label[][3] = { "&&", ";", "||" };
+	static char const command_label[][3] = { "&&", ";", "||", "|" };
 	printf (" \\\n%*s%s\n", indent, "", command_label[c->type]);
 	command_indented_print (indent + 2 * (c->u.command[1]->type != c->type),
 				c->u.command[1]);
-	break;
-      }
-    case PIPE_COMMAND:
-      {
-	if (c->pipe == true)
-	{
-		command_indented_print (indent + 2 * (c->u.command[0]->type != c->type),
-				c->u.command[0]);
-		static char const command_label[][2] = { "|" };
-		printf (" \\\n%*s%s\n", indent, "", command_label[c->type]);
-		command_indented_print (indent + 2 * (c->u.command[1]->type != c->type),
-				c->u.command[1]);
-	}
-	else
-	{
-		command_indented_print (indent + 2 * (c->u.command[0]->type != c->type),
-				c->u.command[0]);
-		static char const command_label[][3] = { ">|" };
-		printf (" \\\n%*s%s\n", indent, "", command_label[c->type]);
-		command_indented_print (indent + 2 * (c->u.command[1]->type != c->type),
-				c->u.command[1]);
-	}
 	break;
       }
     case SIMPLE_COMMAND:
@@ -78,7 +57,7 @@ command_indented_print (int indent, command_t c)
 	printf (">>%s", c->output);
     // end of >> feature and options
   }
-  /*if (c->fd_n > -1)
+  if (c->fd_n > -1)
   {
   	if (c->word_ifd)
   	{
@@ -96,7 +75,11 @@ command_indented_print (int indent, command_t c)
  	 {
    		printf ("%d>&%d", c->fd_n, c->digit_ofd);
 	}
-   }*/
+	else if (c->open_fd)
+	{
+   		printf ("%d<>%s", c->fd_n, c->open_fd);
+	}
+   }
 }
 
 void
