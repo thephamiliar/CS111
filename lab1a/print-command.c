@@ -24,7 +24,6 @@ command_indented_print (int indent, command_t c)
 				c->u.command[1]);
 	break;
       }
-
     case SIMPLE_COMMAND:
       {
 	char **w = c->u.word;
@@ -43,11 +42,44 @@ command_indented_print (int indent, command_t c)
     default:
       abort ();
     }
-
+  
+  
   if (c->input)
     printf ("<%s", c->input);
   if (c->output)
-    printf (">%s", c->output);
+  {
+    // added >> feature and options
+    if (c->append == 0)
+   	printf (">%s", c->output);
+    else if (c->append == 2)
+	printf (" -b >>%s", c->output);
+    else //c->append == 1
+	printf (">>%s", c->output);
+    // end of >> feature and options
+  }
+  if (c->fd_n > -1)
+  {
+  	if (c->word_ifd)
+  	{
+		printf ("%d<&%s", c->fd_n, c->word_ifd);
+  	}
+  	else if (c->word_ofd)
+ 	 {
+   		printf ("%d>&%s", c->fd_n, c->word_ofd);
+ 	 }
+ 	 else if (c->digit_ifd > -1)
+ 	 {
+   		printf ("%d<&%d", c->fd_n, c->digit_ifd);
+ 	 }
+ 	 else if (c->digit_ofd > -1)
+ 	 {
+   		printf ("%d>&%d", c->fd_n, c->digit_ofd);
+	}
+	else if (c->open_fd)
+	{
+   		printf ("%d<>%s", c->fd_n, c->open_fd);
+	}
+   }
 }
 
 void

@@ -22,6 +22,7 @@ bool isWordChar (char c);
 bool isSpecial (char c);
 bool parenCountCheck(char c, int *parenCount, const int lineNum);
 bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum);
+int charToInt (char c);
 //STACK FUNCTIONS
 void pushCMD (command_t* cmdStack, int* cmdSize, command_t cmd);
 void pushOP (enum command_type opStack[], int* opSize, enum command_type type);
@@ -33,7 +34,6 @@ command_t make_simple_cmd (char* word);
 command_t make_special_cmd (command_t left, command_t right, enum command_type type);
 command_t make_subshell_cmd (command_t cmd);
 command_t make_tree (enum command_type opStack[], int* opSize, command_t* cmdStack, int* cmdSize);
-//MEMORY FUNCTIONS
 
 
 
@@ -79,12 +79,34 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     while ((linePos[i] == ' ') || (linePos[i] == '\t'))
         i++;
     char c = linePos[i];
-    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum))
+    if (!isWordChar(c) && !parenCountCheck(c, parenCount, lineNum) && c != '<' && c!='>')
     {
         fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
         exit(1);
     }
-    i++;
+    char d = linePos[i+1]; // special case for Design Lab 1a, for defaulted inputs
+    if (c == '<')
+    {
+        if(d == '&' || d == '>')
+            i+=2;
+        else    // if redirection starts the line without being special then error
+        {
+            fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
+            exit(1);
+        }
+    }
+    else if (c == '>')
+    {
+        if(d == '>' || d == '&' || d == '|')
+                i+=2;
+        else    // if redirection starts the line without being special then error
+        {
+            fprintf(stderr, "%d: Error, invalid line start\n", lineNum);
+            exit(1);
+        }
+    }
+    else
+        i++;
     while(linePos[i] != '\0')
     {
         c = linePos[i];     //speed up accesses in rest of function
@@ -95,12 +117,18 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
             i++;
         else if (isSpecial(c))
         {
-            if (isSpecial(b)) //error: two special characters unless &, |
+            if (isSpecial(b)) //error: two special characters unless &, | or < > if lab1a design lab
             {
                 fprintf(stderr, "%d: Syntax error\n", lineNum);
                 exit(1);
             }
-            else if ((c == '&' && d == '&') || (c == '|' && d == '|'))
+            else if ((c == '&' && d == '&') 
+		  || (c == '|' && d == '|')
+		  || (c == '>' && d == '>') // Design lab 1a additional correct syntax
+		  || (c == '<' && d == '&') 
+		  || (c == '>' && d == '&') 
+		  || (c == '<' && d == '>')
+		  || (c == '>' && d == '|'))
                 i+=2;
             else if (c == '&') // single & is error
             {
@@ -122,12 +150,22 @@ bool isSyntaxGood(char *linePos, int *parenCount, const int lineNum)
     }
     while ((i > 0) && (linePos[i-1] == ' ' || linePos[i-1] == '\t')) //get rid of white space at the end
         i--;
-    if (i > 0 && (linePos[i-1] == '<' || linePos[i-1] == '>')) //error: line can't end in < or >
+    if (i > 0)
     {
-        fprintf(stderr, "%d: Error, cannot end line in < or >\n", lineNum);
-        exit(1);
+        char b = linePos[i-1];
+        if (b == '<' || b == '>'    // error: line can't end in redirection
+       || ((b == '&' || b == '|') && (i-1) > 0 && (linePos[i-2] == '<' || linePos[i-2] == '>'))) // Design Lab addition
+        {
+            fprintf(stderr, "%d: Error, cannot end line in redirection\n", lineNum);
+            exit(1);
+        }
     }
     return true;
+}
+
+int charToInt (char c)
+{
+    return (c-'0')%48;
 }
 
 /* PUSHCMD and PUSHOP: push items onto stacks */
@@ -155,34 +193,40 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	//distinguish between PIPE and OR command
 	if (s[(*index)] == '|')
         {
-	    int i = (*index)+1;
-	    //OR COMMAND	    
-	    if (s[i] == '|')
-	    {
-	    	//push word onto CMD stack as simple command
-		if (sizeOfWord > 0)
+		int i = (*index)+1;
+		//OR COMMAND
+		if (s[i] == '|')
 		{
-		    word[sizeOfWord] = '\0'; 
-		    command_t cmd = make_simple_cmd(word);
-		    pushCMD (cmdStack, cmdSize, cmd);
+			//push word onto CMD stack as simple command
+			if (sizeOfWord > 0)
+			{
+				word[sizeOfWord] = '\0';
+				command_t cmd = make_simple_cmd(word);
+				pushCMD (cmdStack, cmdSize, cmd);
+			}
+			//push 'OR' onto OP stack
+			pushOP(opStack, opSize, OR_COMMAND);
+			(*index) = (*index)+1; //OR takes two chars
+			free(word);
+		} else {
+			if (sizeOfWord > 0)
+			{
+				if (word[sizeOfWord-1] == '>')
+				{
+					if (!isdigit(word[sizeOfWord-2]))
+						word[sizeOfWord-1]='1';
+					else
+						sizeOfWord--;
+				}
+				word[sizeOfWord] = '\0';
+				command_t cmd = make_simple_cmd(word);
+				pushCMD (cmdStack, cmdSize, cmd);
+			}
+			//push 'PIPE' onto op stack
+			pushOP(opStack, opSize, PIPE_COMMAND);
+			free(word);
 		}
-	    	//push 'OR' onto OP stack
-		pushOP(opStack, opSize, OR_COMMAND);
-	    	(*index) = (*index)+1; //OR takes two chars
-	    	free(word);
-	    } else {
-		if (sizeOfWord > 0)
-		{
-	   	word[sizeOfWord] = '\0';
-	    	command_t cmd = make_simple_cmd(word);
-		pushCMD (cmdStack, cmdSize, cmd);
-		}
-	    	//push 'PIPE' onto op stack
-		pushOP(opStack, opSize, PIPE_COMMAND);
-	    	free(word);
-	    	
-	    }
-	    return 1;
+		return 1;
 	}
 	else if (s[(*index)] == '(')
         {
@@ -231,6 +275,13 @@ int get_next_token (char *s, int* index, enum command_type opStack[], int* opSiz
 	}
 	else if (s[(*index)] == '&')
 	{
+	    if (s[(*index)-1] == '>' || s[(*index)-1] == '<')
+	    {
+	        word[sizeOfWord]=s[(*index)];
+	   	sizeOfWord++;
+		(*index) = (*index)+1;
+		continue;
+	    }
 	    if (sizeOfWord > 0)
 	    {
 	   	 //push word onto cmd stack as simple command
@@ -346,9 +397,18 @@ command_t make_simple_cmd (char* word)
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.word = (char**) checked_malloc(MAX_SIZE_ARRAY*sizeof(char*));
     int i = 0; int numOfWords = 0; int numOfChars = 0;
     char *curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+
     while (word[i] != '\0')
     {
 	if ((word[i] == ' ' || word[i] == '\t' || word[i] == '<' || word[i] == '>') && numOfChars != 0)
@@ -361,40 +421,166 @@ command_t make_simple_cmd (char* word)
 	if (word[i] == '<')
 	{
 	    i++;
-	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	    // <& operator
+	    if (word[i] == '&')
 	    {
-		if (word[i] != ' ' && word[i] != '\t')
+		if (isdigit(word[i-2]))
 		{
-		     curr_word[numOfChars] = word[i];
-		     numOfChars++;
+			new_cmd->fd_n = charToInt(word[i-2]);
+			numOfWords--;
 		}
+		else
+			new_cmd->fd_n = 0;
 		i++;
+		while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input word or digit
+		if (numOfChars == 2 && isdigit(curr_word[0]))
+			new_cmd->digit_ifd = charToInt(curr_word[0]);
+		else
+	  		new_cmd->word_ifd = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
 	    }
-            curr_word[numOfChars] = '\0';
-	    //input
-	   new_cmd->input = curr_word; 
-           curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
-	   numOfChars=0;
-	   continue;
+	    // <> operator
+	    else if (word[i] == '>')
+	    {
+		if (isdigit(word[i-2]))
+	        {
+			new_cmd->fd_n = charToInt(word[i-2]);
+			new_cmd->u.word[numOfWords-1]="\0";
+		}
+		else
+			new_cmd->fd_n = 0;
+		i++;
+		while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+		new_cmd->open_fd = curr_word;
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+		continue;
+	    }
+	    // simple < operator
+	    else {
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input
+	  	 new_cmd->input = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+	   }
 	}
-	if (word[i] == '>')
+	else if (word[i] == '>')
 	{
 	    i++;
-	    while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	    // >> operator
+	    if (word[i] == '>')
 	    {
-		if (word[i] != ' ' && word[i] != '\t')
-		{
-		     curr_word[numOfChars] = word[i];
-		     numOfChars++;
+		//check for options
+		if (strcmp(new_cmd->u.word[numOfWords-1],"-b") == 0)
+	        {
+			numOfWords = numOfWords-1;
+			new_cmd->u.word[numOfWords] = '\0';
+			new_cmd->append = 2;
 		}
-		i++;
+		else if (strcmp(new_cmd->u.word[numOfWords-1],"-e") == 0)
+		{
+			numOfWords = numOfWords-1;
+			new_cmd->u.word[numOfWords] = '\0';
+			new_cmd->append = 1;
+	        }
+		else
+		{
+			new_cmd->append = 1;
+		}
+		//output
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+		  	   curr_word[numOfChars] = word[i];
+		   	  numOfChars++;
+			}
+			i++;
+	  	  }
+	   	 curr_word[numOfChars] = '\0';	
+	    	//output
+	   	new_cmd->output = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+ 	  	 continue;
 	    }
-	    curr_word[numOfChars] = '\0';	
-	    //output
-	   new_cmd->output = curr_word; 
-           curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
-	   numOfChars=0;
- 	   continue;
+	    // >& operator
+	    else if (word[i] == '&')
+	    {
+		if (isdigit(word[i-2]))
+	  	{
+			new_cmd->fd_n = charToInt(word[i-2]);
+			numOfWords--;
+		}
+		else
+			new_cmd->fd_n = 1;
+		i++;
+		while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+			     curr_word[numOfChars] = word[i];
+			     numOfChars++;
+			}
+			i++;
+	  	  }
+           	 curr_word[numOfChars] = '\0';
+	    	//input word or digit
+		if (numOfChars == 2 && isdigit(curr_word[0]))
+			new_cmd->digit_ofd = charToInt(curr_word[0]);
+		else
+	  		new_cmd->word_ofd = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+	    }
+	    // simple > operator
+	    else {
+	   	 while (word[i] != '<' && word[i] != '>' && word[i] != '\0')
+	   	 {
+			if (word[i] != ' ' && word[i] != '\t')
+			{
+		  	   curr_word[numOfChars] = word[i];
+		   	  numOfChars++;
+			}
+			i++;
+	  	  }
+	   	 curr_word[numOfChars] = '\0';	
+	    	//output
+	   	new_cmd->output = curr_word; 
+           	curr_word = (char*) checked_malloc(MAX_SIZE_ARRAY*sizeof (char));
+	   	numOfChars=0;
+ 	  	 continue;
+	   }
 	}
 	else
 	{
@@ -407,6 +593,8 @@ command_t make_simple_cmd (char* word)
 	i++;
     }
     curr_word[numOfChars] = '\0';
+    if (numOfWords == 0)
+	new_cmd->u.word[0] = "\0";
     if (numOfChars == 0)
     {
 	free(curr_word);
@@ -414,8 +602,8 @@ command_t make_simple_cmd (char* word)
     else
     {
         new_cmd->u.word[numOfWords] = curr_word;
-        new_cmd->u.word[numOfWords+1] = NULL;
-     }
+        new_cmd->u.word[numOfWords+1] = '\0';
+    }
     if (DEBUG)
 	printf("Exiting simple command...\n");
     return new_cmd;
@@ -431,6 +619,14 @@ command_t make_special_cmd (command_t left, command_t right, enum command_type t
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.command[0] = left;
     new_cmd->u.command[1] = right;
     if(DEBUG)
@@ -448,6 +644,14 @@ command_t make_subshell_cmd(command_t cmd)
     new_cmd->status = -1;
     new_cmd->input = NULL;
     new_cmd->output = NULL;
+    //set default values for added features
+    new_cmd->append = 0;
+    new_cmd->fd_n = -1;
+    new_cmd->word_ifd = NULL;
+    new_cmd->word_ofd = NULL;
+    new_cmd->digit_ifd = -1;
+    new_cmd->digit_ofd = -1;
+    //end of added features
     new_cmd->u.subshell_command = cmd;
     if(DEBUG)
 	printf("Exiting special command...\n");
@@ -528,7 +732,6 @@ make_command_stream (int (*get_next_byte) (void *),
 			c=get_next_byte(get_next_byte_argument);
 			continue;
 		}
-		line++;
 	     newLine = 0;
  	}
 	if (c == '\n') //CHECK FOR DOUBLE NEWLINES, HAVE TO MAKE NEW STACKS 
@@ -570,16 +773,14 @@ make_command_stream (int (*get_next_byte) (void *),
 		//reset stacks
 		opSize = 0; cmdSize = 0; endToken = false;
 		cmdStack =  (command_t*) checked_malloc(MAX_SIZE_ARRAY*sizeof(struct command_t*)); 
-//	   	printf("COMMAND STREAM\n");print(root);
 	    }
 	    else
 	    {
 		if (sizeOfStream > 0)
 		{
 			stream[sizeOfStream] = '\0';
-
 			//pass stream and parenCount into syntax checker
-			isSyntaxGood(stream, &parenCount, line);
+			//isSyntaxGood(stream, &parenCount, line);
 			if (!isSpecial(stream[sizeOfStream-1]) && (stream[sizeOfStream-1] != '('))
 			{
 				stream[sizeOfStream] = ';';

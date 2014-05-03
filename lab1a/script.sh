@@ -7,6 +7,7 @@
 exec echo goodbye world 
 exec ls -a > ls.txt
 exec cat ls.txt > lscopy.txt
+cat < a.txt > c.txt
 
 ls -a > ls.txt
 echo start of this script && echo Line 1 good || echo Line 1 failed
@@ -33,3 +34,14 @@ cmp a.txt c.txt && echo true
 cmp b.txt a.txt && echo All tests were successful > d.txt
 echo Hello World
 
+echo Should be dependent on Node 1 and 4 > c.txt
+
+echo first
+
+echo second
+
+echo third
+
+echo fourth: testing order of execution for non-dependent nodes
+
+echo fifth
