@@ -167,7 +167,7 @@ close FOO;
       "aX"
     ],
     #18
-    [ #added test case
+    [ #Locking the same ramdisk twice would cause deadlock!
       'echo foo | ./osprdaccess -w -l /dev/osprda /dev/osprda ',
       "ioctl OSPRDIOACQUIRE: Resource deadlock"
     ],
