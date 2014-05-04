@@ -166,6 +166,11 @@ close FOO;
       ') 2>/dev/null',
       "aX"
     ],
+    #18
+    [ #added test case
+      'echo foo | ./osprdaccess -w -l /dev/osprda /dev/osprda ',
+      "ioctl OSPRDIOACQUIRE: Resource deadlock"
+    ],
     );
 
 my($ntest) = 0;
