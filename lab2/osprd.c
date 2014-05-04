@@ -423,6 +423,32 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 
 		// Your code here.
 
+		// JESSICA: If the file hasn't locked the ramdisk, return -EINVAL
+		if (!(filp->f_flags & F_OSPRD_LOCKED)) {
+			return -EINVAL;
+		}
+		// JESSICA: Else, free lock and wake up blocked processes
+		else
+		{
+			osp_spin_lock(&(d->mutex));
+			if (filp_writable) {
+				removeFromList(&(d->writeLockingPids), current->pid);	
+			}
+
+			if (pidInList(d->readLockingPids, current->pid)) {
+				removeFromList(&(d->readLockingPids), current->pid);
+			}
+
+		// JESSICA: Clear the lock from filp->f_flags if no processes (not just current process) hold any lock.
+			if (d->holdOtherLocks == 0) {
+				filp->f_flags &= !F_OSPRD_LOCKED;
+			}
+		
+			osp_spin_unlock(&(d->mutex));
+			wake_up_all(&(d->blockq));
+
+			return 0;
+		}
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
 
