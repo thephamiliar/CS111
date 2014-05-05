@@ -661,13 +661,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// block.  If OSPRDIOCACQUIRE would block or return deadlock,
 		// OSPRDIOCTRYACQUIRE should return -EBUSY.
 		// Otherwise, if we can grant the lock request, return 0.
-				//requested a WRITE lock
+		
+		//requested a WRITE lock
 		if (filp_writable) {	
 		
 			//get a ticket
 			osp_spin_lock(&(d->mutex));
 			myTicket = d->ticket_head;
-			d->ticket_head++;
 
 			//Check for deadlock - if I have previous read lock and will have to wait
 			if (pidInList(d->readLockingPids, current->pid)) { 		
@@ -684,31 +684,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				return -EBUSY;
 			}
 
-			osp_spin_unlock(&(d->mutex)); 
-
-			/*
-			TUAN: wait_event_interruptible. The first argument is the wait queue. The second argument is the condition to wake up.
-			The process wakes up when the condition is true or a signal is received.
-			The function returns 0 if the condition is true. Return -ERESTARTSYS if a signal is received.
-			*/
-
-			//Josh: if conditions are not met, return instead of blocking
-			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL || d->readLockingPids != NULL)
+			//JOSH: if conditions are not met, return instead of blocking
+			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL || d->readLockingPids != NULL) {
+				osp_spin_unlock(&(d->mutex));
 				return -EBUSY;
-			else {
-                                //I encountered a signal, return error condition
-                                if (d->ticket_tail == myTicket) {
-                                        grantTicketToNextAliveProcessInOrder(d);
-                                }
-                                else { //add my ticket to non-usable ticket numbers
-                                        addToTicketList(&(d->exitedTickets), myTicket);
-                                }
-
-                                return -ERESTARTSYS;
-                        }
-
+			}
+			
 			//if I arrive here, I have the ticket to proceed, and no one else holds a read or write lock
-			osp_spin_lock(&(d->mutex));
+			d->ticket_head++;
 	
 			//claim the lock officially
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -732,7 +715,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			//get a ticket
 			osp_spin_lock(&(d->mutex));
 			myTicket = d->ticket_head;
-			d->ticket_head++;
 
 			//Check for deadlock - if I have previous write lock and will have to wait
 			if (pidInList(d->writeLockingPids, current->pid)) {
@@ -749,25 +731,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				return -EBUSY;
 			}
 
-			osp_spin_unlock(&(d->mutex)); 
-
-                        //Josh: if conditions are not met, return instead of blocking	
-			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL) 
+                        //JOSH: if conditions are not met, return instead of blocking	
+			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL) {
+				osp_spin_unlock(&(d->mutex));
 				return -EBUSY;
-                        else {
-                                //I encountered a signal, return error condition
-                                if (d->ticket_tail == myTicket) {
-                                        grantTicketToNextAliveProcessInOrder(d);
-                                }
-                                else { //add my ticket to non-usable ticket numbers
-                                        addToTicketList(&(d->exitedTickets), myTicket);
-                                }
-
-                                return -ERESTARTSYS;
-                        }
+			}
 	
 			//if I arrive here, I have the ticket to proceed, and no one else holds a read or write lock
-			osp_spin_lock(&(d->mutex));
+			d->ticket_head++;
 	
 			//claim the lock officially
 			filp->f_flags |= F_OSPRD_LOCKED;
