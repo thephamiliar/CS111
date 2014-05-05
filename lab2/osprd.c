@@ -535,7 +535,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		//requested a WRITE lock
 		if (filp_writable) {	
-		
+
 			//get a ticket
 			osp_spin_lock(&(d->mutex));
 			myTicket = d->ticket_head;
@@ -661,10 +661,126 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// block.  If OSPRDIOCACQUIRE would block or return deadlock,
 		// OSPRDIOCTRYACQUIRE should return -EBUSY.
 		// Otherwise, if we can grant the lock request, return 0.
+				//requested a WRITE lock
+		if (filp_writable) {	
+		
+			//get a ticket
+			osp_spin_lock(&(d->mutex));
+			myTicket = d->ticket_head;
+			d->ticket_head++;
 
-		// Your code here (instead of the next two lines).
-		eprintk("Attempting to try acquire\n");
-		r = -ENOTTY;
+			//Check for deadlock - if I have previous read lock and will have to wait
+			if (pidInList(d->readLockingPids, current->pid)) { 		
+				osp_spin_unlock(&(d->mutex));
+				return -EBUSY;
+			}
+
+			/*
+			TUAN: It is considered deadlock to request the same write lock that you already hold
+			in your current RAM disk.
+			*/
+			if (pidInList(d->writeLockingPids, current->pid)) {
+				osp_spin_unlock(&(d->mutex));
+				return -EBUSY;
+			}
+
+			osp_spin_unlock(&(d->mutex)); 
+
+			/*
+			TUAN: wait_event_interruptible. The first argument is the wait queue. The second argument is the condition to wake up.
+			The process wakes up when the condition is true or a signal is received.
+			The function returns 0 if the condition is true. Return -ERESTARTSYS if a signal is received.
+			*/
+
+			//Josh: if conditions are not met, return instead of blocking
+			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL || d->readLockingPids != NULL)
+				return -EBUSY;
+			else {
+                                //I encountered a signal, return error condition
+                                if (d->ticket_tail == myTicket) {
+                                        grantTicketToNextAliveProcessInOrder(d);
+                                }
+                                else { //add my ticket to non-usable ticket numbers
+                                        addToTicketList(&(d->exitedTickets), myTicket);
+                                }
+
+                                return -ERESTARTSYS;
+                        }
+
+			//if I arrive here, I have the ticket to proceed, and no one else holds a read or write lock
+			osp_spin_lock(&(d->mutex));
+	
+			//claim the lock officially
+			filp->f_flags |= F_OSPRD_LOCKED;
+
+			//TUAN: we keep track of the ID processes that are holding the write lock
+			//Later on, to detect deadlock for the current process, we look up this list
+			//to see if we already have the read or write lock there.
+			addToList(&(d->writeLockingPids), current->pid);
+
+			//TUAN: find next usable ticket number so that the next in-order alive process can use
+			grantTicketToNextAliveProcessInOrder(d);
+
+			osp_spin_unlock(&(d->mutex));
+			wake_up_all(&(d->blockq)); //TUAN: wait up all processes in the wait queue d->blockq and evaluate the condition
+					//in wait_event_interruptable for those processes that go to sleep when invoking this function.
+			return 0;
+		}
+
+		//requested a READ lock
+		else {			
+			//get a ticket
+			osp_spin_lock(&(d->mutex));
+			myTicket = d->ticket_head;
+			d->ticket_head++;
+
+			//Check for deadlock - if I have previous write lock and will have to wait
+			if (pidInList(d->writeLockingPids, current->pid)) {
+				osp_spin_unlock(&(d->mutex));
+				return -EBUSY;
+			}
+
+			/*
+			TUAN: It is considered deadlock to request the same read lock that you already hold
+			in your current RAM disk.
+			*/
+			if (pidInList(d->readLockingPids, current->pid)) {
+				osp_spin_unlock(&(d->mutex));
+				return -EBUSY;
+			}
+
+			osp_spin_unlock(&(d->mutex)); 
+
+                        //Josh: if conditions are not met, return instead of blocking	
+			if (d->ticket_tail!=myTicket || d->writeLockingPids != NULL) 
+				return -EBUSY;
+                        else {
+                                //I encountered a signal, return error condition
+                                if (d->ticket_tail == myTicket) {
+                                        grantTicketToNextAliveProcessInOrder(d);
+                                }
+                                else { //add my ticket to non-usable ticket numbers
+                                        addToTicketList(&(d->exitedTickets), myTicket);
+                                }
+
+                                return -ERESTARTSYS;
+                        }
+	
+			//if I arrive here, I have the ticket to proceed, and no one else holds a read or write lock
+			osp_spin_lock(&(d->mutex));
+	
+			//claim the lock officially
+			filp->f_flags |= F_OSPRD_LOCKED;
+			addToList(&(d->readLockingPids), current->pid);
+
+			//TUAN: find next usable ticket number so that the next in-order alive process can use
+			grantTicketToNextAliveProcessInOrder(d);
+
+			osp_spin_unlock(&(d->mutex));
+			wake_up_all(&(d->blockq)); //TUAN: wake up all the processes that are waiting for the ticket
+						   //by setting the processes in the run queue to runnable state.
+			return 0;
+		}
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
