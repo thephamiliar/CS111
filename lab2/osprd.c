@@ -107,23 +107,19 @@ void removeFromList(struct pidList** list, pid_t pid) {
 		return;
 	}
 	
-	//TUAN: if pid matches the head node
-	if (cur->pid == pid) {
-		(*list)->head = cur->next;
-		kfree(cur); //TUAN: kfree frees kernel memory
-		(*list)->size--;	
-	}
-
-	//TUAN: remove other occurances of pid in the list.
-	while (cur->next != NULL) {	
-		if (cur->next->pid == pid) {
-			toDelete = cur->next;
-			cur->next = cur->next->next;
-			kfree(toDelete);
+	// Remove all occurances of pid
+	while (cur != NULL) {
+		if (cur->pid == pid) {
+			if (cur == (*list)->head) {
+				(*list)->head = cur->next;
+			}
+			toDelete = cur;
+			cur = cur->next;
+			kfree(toDelete); //TUAN: kfree frees kernel memory
 			(*list)->size--;
-			return;
+		} else {
+			cur = cur->next;
 		}
-		cur = cur->next;
 	}
 	if ((*list)->size == 0) {
 		//deallocate list so no memory leaks
