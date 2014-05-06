@@ -166,11 +166,6 @@ close FOO;
       ') 2>/dev/null',
       "aX"
     ],
-    #18
-    [ #Locking the same ramdisk twice would cause deadlock!
-      'echo foo | ./osprdaccess -w -l /dev/osprda /dev/osprda ',
-      "ioctl OSPRDIOACQUIRE: Resource deadlock"
-    ],
     );
 
 my($ntest) = 0;
