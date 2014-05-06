@@ -427,7 +427,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		{
 			osp_spin_lock(&(d->mutex));
 			//JESSICA: remove locks
-			if (pidInList(d->readLockingPids, current->pid)) {
+			if (filp_writable) {
 				removeFromList(&(d->writeLockingPids), current->pid);	
 			}
 
