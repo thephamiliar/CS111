@@ -199,20 +199,19 @@ void removeFromTicketList(struct ticketList** list, unsigned ticket) {
 	if (cur == NULL) {
 		return;
 	}
-	if (cur->ticket == ticket) {
-		(*list)->head = cur->next;
-		kfree(cur);
-		(*list)->size--;	
-	}
-	while (cur->next != NULL) {	
-		if (cur->next->ticket == ticket) {
-			toDelete = cur->next;
-			cur->next = cur->next->next;
-			kfree(toDelete);
+	// Remove all occurances of ticket
+	while (cur != NULL) {
+		if (cur->ticket == ticket) {
+			if (cur == (*list)->head) {
+				(*list)->head = cur->next;
+			}
+			toDelete = cur;
+			cur = cur->next;
+			kfree(toDelete); //TUAN: kfree frees kernel memory
 			(*list)->size--;
-			return;
+		} else {
+			cur = cur->next;
 		}
-		cur = cur->next;
 	}
 	if ((*list)->size == 0) {
 		//deallocate list so no memory leaks
