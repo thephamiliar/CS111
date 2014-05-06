@@ -426,7 +426,8 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		else
 		{
 			osp_spin_lock(&(d->mutex));
-			if (filp_writable) {
+			//JESSICA: remove locks
+			if (pidInList(d->readLockingPids, current->pid)) {
 				removeFromList(&(d->writeLockingPids), current->pid);	
 			}
 
@@ -434,12 +435,13 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 				removeFromList(&(d->readLockingPids), current->pid);
 			}
 
-		// JESSICA: Clear the lock from filp->f_flags if no processes (not just current process) hold any lock.
+			// JESSICA: Clear the lock from filp->f_flags
 			if (d->holdOtherLocks == 0) {
 				filp->f_flags &= !F_OSPRD_LOCKED;
 			}
 		
 			osp_spin_unlock(&(d->mutex));
+			// JESSICA: wake up blocked processes
 			wake_up_all(&(d->blockq));
 
 			return 0;
