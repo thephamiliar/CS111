@@ -474,60 +474,57 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * your function should advance f_pos by the proper amount to
 		 * advance to the next directory entry.
 		 */
-
 		/* EXERCISE: Your code here */
-		                // JOSH: check if gone through all directory entries
+		// JOSH: check if gone through all directory entries
                 if (dir_oi->oi_size <= (f_pos-2) * OSPFS_DIRENTRY_SIZE)
                 {
-                        r = 1;
-                        break;
-                }
-                //JOSH: get next entry in directory, accounting for offset for "." and ".."
-                od = ospfs_inode_data(dir_oi, (f_pos-2) * OSPFS_DIRENTRY_SIZE);
-                entry_oi = ospfs_inode(od->od_ino);
-                if (od == NULL || entry_oi == NULL) // error with getting direntry or inode
-                {
-                        r = -1;
-                        break;
-                }
-                if (od->od_ino > 0) // check for a non-blank entry
-                {
-                        uint32_t fileType = -1;
-                        switch(entry_oi->oi_ftype)
-                        {
-                                case OSPFS_FTYPE_REG:
-                                        fileType = DT_REG;
-                                        break;
-                                case OSPFS_FTYPE_DIR:
-                                        fileType = DT_DIR;
-                                        break;
-                                case OSPFS_FTYPE_SYMLINK:
-                                        fileType = DT_LNK;
-                                        break;
-                        }
-                        if (fileType = -1) // error with getting file type
-                        {
-                                r = -1;
-                                break;
-                        }
-                        ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, fileType);
-                        if (ok_so_far>=0) // no errors
-                                f_pos++;
-                        else
-                        {
-                                r = 0;
-                                break;
-                        }
-                else    // skip over blank directory entries
-                        f_pos++;
-                }
-        }
-
-        // Save the file position and return!
-        filp->f_pos = f_pos;
-        return r;
-
+		        r = 1;
+			break;
+		}
+		//JOSH: get next entry in directory, accounting for offset for "." and ".."
+		od = ospfs_inode_data(dir_oi, (f_pos-2) * OSPFS_DIRENTRY_SIZE);	
+		entry_oi = ospfs_inode(od->od_ino);
+		if (od == NULL || entry_oi == NULL) // error with getting direntry or inode
+		{	
+			r = -1;
+			break;
+		}
+		if (od->od_ino > 0) // check for a non-blank entry
+		{
+			uint32_t fileType = -1;
+			switch(entry_oi->oi_ftype)
+			{
+				case OSPFS_FTYPE_REG:
+					fileType = DT_REG;
+					break;
+				case OSPFS_FTYPE_DIR:
+					fileType = DT_DIR;
+					break;
+				case OSPFS_FTYPE_SYMLINK:
+					fileType = DT_LNK;
+					break;
+			}
+			if (fileType == -1) // error with getting file type
+			{
+				r = -1;
+				break;	
+			}
+			ok_so_far = filldir(dirent, od->od_name, strlen(od->od_name), f_pos, od->od_ino, fileType);
+			if (ok_so_far>=0) // no errors
+				f_pos++;
+			else
+			{
+				r = 0;
+				break;
+			}
+		}	
+		else	// skip over blank directory entries
+			f_pos++;			
 	}
+
+	// Save the file position and return!
+	filp->f_pos = f_pos;
+	return r;
 }
 
 
