@@ -1315,17 +1315,8 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	int addB = add_block(dir_oi);	
 	if (addB < 0)
 		return ERR_PTR(addB); // unsuccessful add
-	// otherwise the block was added 
-	uint32_t old_f_pos = f_pos;
-	// clear out all direntries in new block
-        for (; f_pos*OSPFS_DIRENTRY_SIZE < dir_oi->oi_size; f_pos++)
-        {
-                blankEntry = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
-                if (blankEntry == NULL) // error in acquiring direntry
-                        return ERR_PTR(-EFAULT);
-		blankEntry->od_ino = 0;
-	}
-        blankEntry = ospfs_inode_data(dir_oi, old_f_pos * OSPFS_DIRENTRY_SIZE);
+	// otherwise the block was added and zeroed by add_block
+        blankEntry = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
         if (blankEntry == NULL) // error in acquiring direntry
 	        return ERR_PTR(-EFAULT);
 	return blankEntry; // success
@@ -1338,7 +1329,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //
 //   Inputs: src_dentry   -- a pointer to the dentry for the source file.  This
 //                           file's inode contains the real data for the hard
-//                           linked filae.  The important elements are:
+//                           linked file.  The important elements are:
 //                             src_dentry->d_name.name
 //                             src_dentry->d_name.len
 //                             src_dentry->d_inode->i_ino
@@ -1359,12 +1350,30 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //               -ENOSPC       if the disk is full & the file can't be created;
 //               -EIO          on I/O error.
 //
-//   EXERCISE: Complete this function.
+//   JOSH COMPLETED EXERCISE: Complete this function.
 
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+	/* COMPLETED EXERCISE: Your code here. */
+	// make sure the hard link name is not too big
+	if (dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
+		return -ENAMETOOLONG;	
+
+	// check if file name already exists
+        ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+	ospfs_inode_t *direntryFound = find_direntry(dir_oi, dst_dentry->d_name.name, dst_dentry->d_name.len);
+	if (direntryFound != NULL) 
+		return -EEXIST; 
+
+	ospfs_direntry_t *newLink = create_blank_direntry(dir_oi);
+	if (IS_ERR(newLink)) // error if no more space
+		return -ENOSPC;
+
+	// no errors so create the link	
+	ospfs_inode(src_dentry->d_inode->i_ino)->oi_nlink++;
+	newLink->od_ino = src_dentry->d_inode->i_ino;
+	strcpy(newLink->od_name, dst_dentry->d_name.name);
+	return 0;
 }
 
 // ospfs_create
