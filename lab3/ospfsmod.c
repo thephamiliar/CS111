@@ -14,6 +14,9 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <stdbool.h>
+
+bool DEBUG = false; // debugging print out messages
 
 /****************************************************************************
  * ospfsmod
@@ -418,8 +421,7 @@ ospfs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *ign
 //   Returns: 1 at end of directory, 0 if filldir returns < 0 before the end
 //     of the directory, and -(error number) on error.
 //
-//   EXERCISE: Finish implementing this function.
-
+//   JOSH COMPLETED EXERCISE: Finish implementing this function.  
 static int
 ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
@@ -445,8 +447,8 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	// actual entries
 	while (r == 0 && ok_so_far >= 0 && f_pos >= 2) {
-		ospfs_direntry_t *od;
-		ospfs_inode_t *entry_oi;
+		ospfs_direntry_t *od = NULL;
+		ospfs_inode_t *entry_oi = NULL;
 
 		/* If at the end of the directory, set 'r' to 1 and exit
 		 * the loop.  For now we do this all the time.
@@ -474,7 +476,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * your function should advance f_pos by the proper amount to
 		 * advance to the next directory entry.
 		 */
-		/* EXERCISE: Your code here */
+		/* JOSH COMPLETED EXERCISE: Your code here */
 		// JOSH: check if gone through all directory entries
                 if (dir_oi->oi_size <= (f_pos-2) * OSPFS_DIRENTRY_SIZE)
                 {
@@ -491,7 +493,9 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 		if (od->od_ino > 0) // check for a non-blank entry
 		{
-			uint32_t fileType = -1;
+			if (DEBUG)
+				eprintk("File name: %s\n", od->od_name);
+			uint32_t fileType = 9;
 			switch(entry_oi->oi_ftype)
 			{
 				case OSPFS_FTYPE_REG:
@@ -504,7 +508,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 					fileType = DT_LNK;
 					break;
 			}
-			if (fileType == -1) // error with getting file type
+			if (fileType == 9) // error with getting file type
 			{
 				r = -1;
 				break;	
@@ -1283,7 +1287,7 @@ find_direntry(ospfs_inode_t *dir_oi, const char *name, int namelen)
 //
 //	The create_blank_direntry function should use this convention.
 //
-// EXERCISE: Write this function.
+// JOSH COMPLETED EXERCISE: Write this function.
 
 static ospfs_direntry_t *
 create_blank_direntry(ospfs_inode_t *dir_oi)
@@ -1295,8 +1299,37 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
 	//    entries and return one of them.
 
-	/* EXERCISE: Your code here. */
-	return ERR_PTR(-EINVAL); // Replace this line
+	/* JOSH COMPLETED EXERCISE: Your code here. */ 
+	ospfs_direntry_t *blankEntry = NULL;
+	uint32_t f_pos;
+	// find first empty direntry
+	for (f_pos = 0; f_pos*OSPFS_DIRENTRY_SIZE < dir_oi->oi_size; f_pos++)
+	{
+		blankEntry = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
+		if (blankEntry == NULL) // error in acquiring direntry
+			return ERR_PTR(-EFAULT);
+		if (blankEntry->od_ino == 0) // blank entry
+			return blankEntry;
+	}
+	// no blank entries so we must add a new block
+	int addB = add_block(dir_oi);	
+	if (addB < 0)
+		return ERR_PTR(addB); // unsuccessful add
+	// otherwise the block was added 
+	uint32_t old_f_pos = f_pos;
+	// clear out all direntries in new block
+        for (; f_pos*OSPFS_DIRENTRY_SIZE < dir_oi->oi_size; f_pos++)
+        {
+                blankEntry = ospfs_inode_data(dir_oi, f_pos * OSPFS_DIRENTRY_SIZE);
+                if (blankEntry == NULL) // error in acquiring direntry
+                        return ERR_PTR(-EFAULT);
+		blankEntry->od_ino = 0;
+	}
+        blankEntry = ospfs_inode_data(dir_oi, old_f_pos * OSPFS_DIRENTRY_SIZE);
+        if (blankEntry == NULL) // error in acquiring direntry
+	        return ERR_PTR(-EFAULT);
+	return blankEntry; // success
+
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
