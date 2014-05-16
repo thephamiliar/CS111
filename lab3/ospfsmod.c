@@ -1367,7 +1367,7 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 
 	ospfs_direntry_t *newLink = create_blank_direntry(dir_oi);
 	if (IS_ERR(newLink)) // error if no more space
-		return -ENOSPC;
+		return PTR_ERR(newLink);
 
 	// no errors so create the link	
 	ospfs_inode(src_dentry->d_inode->i_ino)->oi_nlink++;
@@ -1507,10 +1507,46 @@ static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
-	uint32_t entry_ino = 0;
-
+	uint32_t entry_ino = 2; // first two reserved inodes
+	ospfs_symlink_inode_t *newSym = NULL;
 	/* EXERCISE: Your code here. */
-	return -EINVAL;
+        // make sure the symlink name is not too big
+        if (dentry->d_name.len > OSPFS_MAXSYMLINKLEN)
+                return -ENAMETOOLONG;
+
+        // check if file name already exists
+        ospfs_inode_t *direntryFound = find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len);
+        if (direntryFound != NULL)
+                return -EEXIST;
+
+        ospfs_direntry_t *newDirentry = create_blank_direntry(dir_oi);
+        if (IS_ERR(newDirentry)) // error if no more space
+                return PTR_ERR(newDirentry);
+
+        // no errors so create the link 
+	// first find an empty inode.  Set the 'entry_ino' variable to its inode number.
+        while (entry_ino < ospfs_super->os_ninodes)
+        {
+                newSym = ospfs_inode(entry_ino);
+                if (newSym == NULL)
+			return -EFAULT;
+		//if free inode
+                if (newSym->oi_nlink == 0)
+                        break;
+                entry_ino++;
+        }
+	// error if no open inodes
+	if (entry_ino == ospfs_super->os_ninodes)
+		return -ENOSPC;
+
+	// fill symlink inode
+	newSym->oi_nlink++;
+	newSym->oi_ftype = OSPFS_FTYPE_SYMLINK;
+	newSym->oi_size = strlen(symname);
+	strcpy(newSym->oi_symlink, symname);
+	// create direntry
+        newDirentry->od_ino = entry_ino;
+        strcpy(newDirentry->od_name, dentry->d_name.name);
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
@@ -1616,4 +1652,3 @@ module_exit(exit_ospfs_fs)
 MODULE_AUTHOR("Skeletor");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");
-
