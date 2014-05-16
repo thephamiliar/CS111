@@ -542,7 +542,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 //
 //   Returns: 0 if success and -ENOENT on entry not found.
 //
-//   EXERCISE: Make sure that deleting symbolic links works correctly.
+//   JOSH COMPLETED EXERCISE: Make sure that deleting symbolic links works correctly.
 
 static int
 ospfs_unlink(struct inode *dirino, struct dentry *dentry)
@@ -1372,7 +1372,7 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 	// no errors so create the link	
 	ospfs_inode(src_dentry->d_inode->i_ino)->oi_nlink++;
 	newLink->od_ino = src_dentry->d_inode->i_ino;
-	strcpy(newLink->od_name, dst_dentry->d_name.name);
+	memcpy(newLink->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len+1);
 	return 0;
 }
 
@@ -1511,7 +1511,7 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	ospfs_symlink_inode_t *newSym = NULL;
 	/* EXERCISE: Your code here. */
         // make sure the symlink name is not too big
-        if (dentry->d_name.len > OSPFS_MAXSYMLINKLEN)
+        if (dentry->d_name.len > OSPFS_MAXNAMELEN || strlen(symname) > OSPFS_MAXSYMLINKLEN)
                 return -ENAMETOOLONG;
 
         // check if file name already exists
@@ -1543,10 +1543,10 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	newSym->oi_nlink++;
 	newSym->oi_ftype = OSPFS_FTYPE_SYMLINK;
 	newSym->oi_size = strlen(symname);
-	strcpy(newSym->oi_symlink, symname);
+	memcpy(newSym->oi_symlink, symname, strlen(symname)+1);
 	// create direntry
         newDirentry->od_ino = entry_ino;
-        strcpy(newDirentry->od_name, dentry->d_name.name);
+        memcpy(newDirentry->od_name, dentry->d_name.name, dentry->d_name.len+1);
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
@@ -1568,7 +1568,7 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 //   Inputs: dentry -- the symbolic link's directory entry
 //           nd     -- to be filled in with the symbolic link's destination
 //
-//   Exercise: Expand this function to handle conditional symlinks.  Conditional
+//   JOSH COMPLETED Exercise: Expand this function to handle conditional symlinks.  Conditional
 //   symlinks will always be created by users in the following form
 //     root?/path/1:/path/2.
 //   (hint: Should the given form be changed in any way to make this method
@@ -1580,7 +1580,23 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
 	// Exercise: Your code here.
-
+	//check for root?
+	if (strncmp(oi->oi_symlink, "root?", 5) == 0)
+	{
+		// starting from first path after root?
+		int i = 5;
+		while (oi->oi_symlink[i] != ':')
+			i++;
+		// once ':' is found, replace it with null '\0'
+		oi->oi_symlink[i] = '\0';
+		// check if root
+		if (current->uid == 0)
+			nd_set_link(nd, oi->oi_symlink + 5);
+		else // not root
+			nd_set_link(nd, oi->oi_symlink + i+1);
+		return (void *) 0;		
+	}
+	// normal symlink
 	nd_set_link(nd, oi->oi_symlink);
 	return (void *) 0;
 }
