@@ -1408,10 +1408,65 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 static int
 ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
+
+	if (DEBUG)
+		eprintk("create\n");
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
-	uint32_t entry_ino = 0;
+
+	//first two inodes entries are reserved
+	uint32_t entry_ino = 2;
+
 	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+	
+	ospfs_direntry_t *new_direntry;
+	ospfs_inode_t *new_inode;
+
+	//Check for the -ENAMETOOLONG error
+	if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+		return -ENAMETOOLONG;
+
+	//  Check for the -EEXIST error and find an empty directory entry using the
+	//	helper functions above.
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len) != NULL)
+		return -EEXIST;
+	else
+		new_direntry = create_blank_direntry(dir_oi);
+		if (IS_ERR(new_direntry))
+			return PTR_ERR(new_direntry);
+	if (DEBUG)
+		eprintk("%d\n", entry_ino);
+
+	//   Find an empty inode.  Set the 'entry_ino' variable to its inode number.
+	while (entry_ino < ospfs_super->os_ninodes)
+	{
+		new_inode = ospfs_inode(entry_ino);
+		//if free inode
+		if (new_inode->oi_nlink == 0)
+			break;
+		entry_ino++;
+	}
+	
+	//if could not find inode
+	if (entry_ino >= ospfs_super->os_ninodes)
+		return -ENOSPC;
+
+	//  Initialize the directory entry
+	new_direntry->od_ino = entry_ino;
+	memcpy(new_direntry->od_name, dentry->d_name.name, dentry->d_name.len);
+	new_direntry->od_name[dentry->d_name.len] = '\0';
+	if (DEBUG)
+		eprintk("%d", entry_ino);
+	//Initialize the inode
+	new_inode->oi_size = 0;             	// File size
+	new_inode->oi_ftype = OSPFS_FTYPE_REG;  // OSPFS_FTYPE_* constant
+	new_inode->oi_nlink = 1;                // Link count (0 means free)
+	new_inode->oi_mode = mode;	    	// File permissions mode
+	//zero out blocks
+	int i;
+	for (i = 0; i < OSPFS_NDIRECT; i++)
+		new_inode->oi_direct[i] = 0;    // Direct block pointers
+	new_inode->oi_indirect = 0;             // Indirect block
+	new_inode->oi_indirect2 = 0;		// Doubly indirect block
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
@@ -1561,3 +1616,4 @@ module_exit(exit_ospfs_fs)
 MODULE_AUTHOR("Skeletor");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");
+
