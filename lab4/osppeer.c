@@ -2,6 +2,7 @@
 #define _BSD_EXTENSION
 #include <stdlib.h>
 #include <string.h>
+#include <error.h>
 #include <errno.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -758,14 +759,54 @@ int main(int argc, char *argv[])
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
 
+// TASK 1: PARALLELIZE DOWNLOAD
 	// First, download files named on command line.
-	for (; argc > 1; argc--, argv++)
+	int childCount = 0;
+	for (; argc > 1; argc--, argv++) {
 		if ((t = start_download(tracker_task, argv[1])))
-			task_download(t, tracker_task);
+		{
+			pid_t pid;
+			if ((pid=fork()) < 0)
+			{
+				error(1, 0, "fork was unsuccessful\n");
+				continue;
+			}
+			if (pid == 0)
+			{
+				task_download(t, tracker_task);
+				_exit(0);
+			}
+			if (pid > 0)
+			{
+				childCount++;
+				task_free(t);
+			}
+		}
+	}
+
+	while (childCount-- > 0) {
+		waitpid(-1, NULL, 0);
+	}
 
 	// Then accept connections from other peers and upload files to them!
-	while ((t = task_listen(listen_task)))
-		task_upload(t);
+	while ((t = task_listen(listen_task))) {
+		pid_t pid;
+		waitpid(-1, NULL, WNOHANG);
+		if ((pid=fork()) < 0)
+		{
+			error(1, 0, "fork was unsuccessful\n");
+			continue;
+		}
+		if (pid == 0)
+		{
+			task_upload(t);
+			_exit(0);
+		}
+		if (pid > 0)
+		{
+			task_free(t);
+		}
+	}
 
 	return 0;
 }
