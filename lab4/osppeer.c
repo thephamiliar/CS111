@@ -650,7 +650,13 @@ static void task_upload(task_t *t)
 		goto exit;
 	}
 	t->head = t->tail = 0;
-	
+
+	// TASK 2: Make sure only files in current directory are being served
+	if (memchr(t->filename, '/', FILENAMESIZ) != 0)
+	{
+		error("Cannot access files outside of current directory\n");
+		goto exit;
+	}
 	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
