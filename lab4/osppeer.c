@@ -2,7 +2,6 @@
 #define _BSD_EXTENSION
 #include <stdlib.h>
 #include <string.h>
-#include <error.h>
 #include <errno.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -23,6 +22,8 @@
 #include <limits.h>
 #include "md5.h"
 #include "osp2p.h"
+
+#include <sys/wait.h>
 
 int evil_mode;			// nonzero iff this peer should behave badly
 
@@ -768,7 +769,7 @@ int main(int argc, char *argv[])
 			pid_t pid;
 			if ((pid=fork()) < 0)
 			{
-				error(1, 0, "fork was unsuccessful\n");
+				error("fork was unsuccessful\n");
 				continue;
 			}
 			if (pid == 0)
@@ -794,7 +795,7 @@ int main(int argc, char *argv[])
 		waitpid(-1, NULL, WNOHANG);
 		if ((pid=fork()) < 0)
 		{
-			error(1, 0, "fork was unsuccessful\n");
+			error("fork was unsuccessful\n");
 			continue;
 		}
 		if (pid == 0)
