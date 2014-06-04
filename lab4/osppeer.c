@@ -478,7 +478,7 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 		error("* Error while allocating task");
 		goto exit;
 	}
-	strcpy(t->filename, filename);
+	strncpy(t->filename, filename, FILENAMESIZ);
 
 	// add peers
 	s1 = tracker_task->buf;
@@ -535,7 +535,8 @@ static void task_download(task_t *t, task_t *tracker_task)
 	// at all.
 	for (i = 0; i < 50; i++) {
 		if (i == 0)
-			strcpy(t->disk_filename, t->filename);
+			// TASK 2: Fixed buffer overrun bug
+			strncpy(t->disk_filename, t->filename, FILENAMESIZ);
 		else
 			sprintf(t->disk_filename, "%s~%d~", t->filename, i);
 		t->disk_fd = open(t->disk_filename,
@@ -651,6 +652,13 @@ static void task_upload(task_t *t)
 	}
 	t->head = t->tail = 0;
 
+	// TASK 2: Make sure only files in current directory are being served
+	if (memchr(t->filename, '/', FILENAMESIZ) != 0)
+	{
+		error("Cannot access files outside of current directory\n");
+		goto exit;
+	}
+	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
