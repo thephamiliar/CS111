@@ -36,8 +36,10 @@ static int listen_port;
  * Holds all information relevant for a peer or tracker connection, including
  * a bounded buffer that simplifies reading from and writing to peers.
  */
+ // TASK 2: Fixed popular tracker bug
+#define TASKBUFSIZ  20480
 
-#define TASKBUFSIZ	4096	// Size of task_t::buf
+//#define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 
 typedef enum tasktype {		// Which type of connection is this?
@@ -652,12 +654,12 @@ static void task_upload(task_t *t)
 	t->head = t->tail = 0;
 
 	// TASK 2: Make sure only files in current directory are being served
-	if (memchr(t->filename, '/', FILENAMESIZ) != 0)
+	if (memchr(t->filename, '/', FILENAMESIZ) != NULL)
 	{
 		error("Cannot access files outside of current directory\n");
 		goto exit;
 	}
-	
+
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
