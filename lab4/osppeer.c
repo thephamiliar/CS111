@@ -42,6 +42,11 @@ static int listen_port;
 //#define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 
+// TASK 3: Fix Garbage File size for overflow attack
+#define GARBAGE_SIZ 20480
+char* garbage[GARBAGE_SIZ+1];
+
+
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
 	TASK_PEER_LISTEN,	// => Listens for upload requests
@@ -665,27 +670,37 @@ static void task_upload(task_t *t)
 		error("* Cannot open file %s", t->filename);
 		goto exit;
 	}
-
+	
 	message("* Transferring file %s\n", t->filename);
-	// Now, read file from disk and write it to the requesting peer.
-	while (1) {
-		int ret = write_from_taskbuf(t->peer_fd, t);
-		if (ret == TBUF_ERROR) {
-			error("* Peer write error");
-			goto exit;
+	if (evil_mode > 0) 
+	{
+		// JOSH: overflow peer buffer with garbage data
+		while(1)
+		{
+			write(t->peer_fd, &garbage[0], GARBAGE_SIZ);
 		}
-
-		ret = read_to_taskbuf(t->disk_fd, t);
-		if (ret == TBUF_ERROR) {
-			error("* Disk read error");
-			goto exit;
-		} else if (ret == TBUF_END && t->head == t->tail)
-			/* End of file */
-			break;
+		printf("* Evil buffer overflow attack successful\n");	
 	}
+	else
+	{
+		// Now, read file from disk and write it to the requesting peer.
+		while (1) {
+			int ret = write_from_taskbuf(t->peer_fd, t);
+			if (ret == TBUF_ERROR) {
+			    error("* Peer write error");
+			    goto exit;
+			}
 
+			ret = read_to_taskbuf(t->disk_fd, t);
+			if (ret == TBUF_ERROR) {
+			    error("* Disk read error");
+			    goto exit;
+			} else if (ret == TBUF_END && t->head == t->tail)
+				/* End of file */
+				break;
+		}
 	message("* Upload of %s complete\n", t->filename);
-
+	}
     exit:
 	task_free(t);
 }
@@ -702,6 +717,7 @@ int main(int argc, char *argv[])
 	const char *myalias;
 	struct passwd *pwent;
 
+	
 	// Default tracker is read.cs.ucla.edu
 	osp2p_sscanf("131.179.80.139:11111", "%I:%d",
 		     &tracker_addr, &tracker_port);
@@ -768,7 +784,12 @@ int main(int argc, char *argv[])
 	tracker_task = start_tracker(tracker_addr, tracker_port);
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
-
+	if (evil_mode > 0)
+	{ 	// create a garbage file for malicious buffer overflow
+		printf("Running in evil mode!\n");
+		memset(garbage, '!', GARBAGE_SIZ);	
+	
+	}
 // TASK 1: PARALLELIZE DOWNLOAD
 	// First, download files named on command line.
 	int childCount = 0;
