@@ -1,61 +1,91 @@
-# Fill in your name, student ID, and email address in this file.
-# If you are working in a team, fill out the information for both team 
-# members.
+# Fill in your name, student ID, and email address in this file.  If you are
+# working in a team, fill out the information for both team members.
 
 # SUBMIT THE LAB ONLY ONCE (from only one partner). This file will be
-# automatically parsed in order to give both team members credit for the
-# lab.
+# automatically parsed in order to give both team members credit for the lab.
 
-# You need to fill in the EXERCISE sections describing your solutions
-# for Tasks 1, 2, and 3, as well as write the corresponding code.
-# If you did one or more extra credit problems, indicate which one in the
-# appropriate section below (remove the # sign first). If you have any other
-# information you'd like us to know, please add it at the end of the file.
+# You need to fill in the EXERCISE sections describing your solutions for Tasks
+# 1, 2, and 3, as well as write the corresponding code.  If you did one or more
+# extra credit problems, indicate which one in the appropriate section below
+# (remove the # sign first). If you have any other information you'd like us to
+# know, please add it at the end of the file.
 
 # Partner 1
-Name: Jessica Pham
-Student ID: 004153744
+Name: Jessica Pham 
+Student ID: 004153744 
 Email: solapower613@ucla.edu
 
 # Partner 2 (if you're working in a team)
-Name: Joshua St Clair
-Student ID: 904187688
+Name: Joshua St Clair 
+Student ID: 904187688 
 Email: joshstclair@ucla.edu
 
-# EXERCISE 1: What method you used to make your peer download and upload
-#    files in parallel?  (~1-3 sentences)
-We forked the processes. We first parallelized the downloads, and then
-proceeded to parallelize the uploads.
+# EXERCISE 1: What method you used to make your peer download and upload files
+# in parallel?  (~1-3 sentences)
+We forked the processes. We first parallelized the downloads, and then proceeded
+to parallelize the uploads.
 
-# EXERCISE 2A: What conditions did you find and fix that would have
-#    triggered a buffer overrun bug?  (~1-3 sentences each)
-BUFFER OVERFLOW:
-The buffer overrun bug is triggered in the strcpy() function in the download
-functions. To resolve this, we just changed the function into strncpy() and 
-specified the max number of characters, FILENAMESIZ.
+# EXERCISE 2A: What conditions did you find and fix that would have triggered a
+# buffer overrun bug?  (~1-3 sentences each)
+BUFFER OVERFLOW: 
+The buffer overrun bug is triggered in the strcpy() function in
+the download functions. To resolve this, we just changed the function into
+strncpy() and specified the max number of characters, FILENAMESIZ.
 
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
-#    each)
-ONLY SERVE FILES IN CURRENT DIRECTORY:
-To prevent peers from requesting files outside of the current directory, we 
-check if the filename has a '\' since this specifies that the file is in another 
-directory. We make this check in the task_upload() function right before it 
-opens the file and return and error if it finds '\' in the filename.
+# each)
+ONLY SERVE FILES IN CURRENT DIRECTORY: 
+To prevent peers from requesting files
+outside of the current directory, we check if the filename has a '\' since this
+specifies that the file is in another directory. We make this check in the
+task_upload() function right before it opens the file and return and error if it
+finds '\' in the filename.
 
 POPULATED TRACKER: 
-When the task buffer is full, the tracker connection prematurely closes since
-there are too many peer requests. We attempted to dynamically allocate the buffer
-array. However, since this required many changes to the original implementation, 
-we just increased the value TASKBUFSIZ by 5 times the original value.
+When the task buffer is full, the tracker connection
+prematurely closes since there are too many peer requests. We attempted to
+dynamically allocate the buffer array. However, since this required many changes
+to the original implementation, we just increased the value TASKBUFSIZ by 5
+times the original value.
 
-GARBAGE FILES:
-To defend against this attack, we set a MAX_FILE_SIZE and check whether our peer 
-has downloaded more than this value. If the file exceeds this value, then we report 
-an error and exit. This prevents attackers from sending us large files, such as 
-/dev/null.
+GARBAGE FILES: 
+To defend against this attack, we set a MAX_FILE_SIZE and check
+whether our peer has downloaded more than this value. If the file exceeds this
+value, then we report an error and exit. This prevents attackers from sending us
+large files, such as /dev/null.
 
-# EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
-#    are they attacks?  (~3-10 sentences each)
+TOO MANY CONNECTIONS:
+To defend against a denial of service attack where too mnay peers are trying to
+connect to our peer, we added a limit to the number of connections our peer can
+serve before refusing additonal requests. We capped the max at 1000 peers. In
+real life situations, it would need to be much higher but for the purposes of
+this lab, we don't expect to need to service more than that.
+
+
+# EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why are
+# they attacks?  (~3-10 sentences each)
+
+UPLOAD ATTACK: 
+When a peer attempts to download files from our peer, we send them garbage data
+indefinitely until their buffers overflow, or connection is lost. We were not
+able to get it to crash another peer but the intention was to either hang the
+peer indefinitely or crash it. This is an attack because if the peer's buffers
+are overrun with garbage data, it could overwrite other important code for the
+peer. It could crash the peer or cause it to stall and not be able to service
+other peers. If used properly, it can also be used to gain control of the peer.
+
+DOWNLOAD ATTACK:
+When downloading files from another peer, we attempted to overwhelm the peer
+with 1000 connections hoping it would crash or hang indefinitely, although we
+were unsuccessful of this during our tests. This would be an attack for the same
+reason as mentioned in the upload attack. The other peer cannot service others
+or do anything productive while it hangs, waiting to service the 1000
+connections. 
+Another download attack that we implemented was downloading files outside the
+current directory. Because we were focusing on DOSing the other peer with
+connections, we commented out the code to steal other files. But this would be
+malicious because it would allow a peer to steal private files (possible
+confidential) that it shouldn't have access to.
 
 # Extra credit problems
 #Extra credit problem: none

